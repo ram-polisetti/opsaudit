@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use opsaudit, please cite it using this metadata."
+type: software
+title: "opsaudit"
+version: 0.1.0
+date-released: 2026-09-18
+abstract: "A practical Python toolkit for auditing disparity signals in operational machine-learning decisions."
+authors:
+  - family-names: Polisetti
+    given-names: Ram Charan
+license: Apache-2.0
+repository-code: "https://github.com/ram-polisetti/opsaudit"
+url: "https://github.com/ram-polisetti/opsaudit"
+keywords:
+  - responsible AI
+  - AI governance
+  - operational analytics
+  - algorithmic fairness
+  - supply chain

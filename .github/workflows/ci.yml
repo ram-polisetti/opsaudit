@@ -12,5 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "${{ matrix.python-version }}"}
-      - run: pip install -e .[dev]
+      - run: pip install -e .[dev,release]
       - run: pytest --cov=src/opsaudit --cov-fail-under=80
+      - run: python -m build
+      - run: twine check dist/*

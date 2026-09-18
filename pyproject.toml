@@ -7,13 +7,35 @@ name = "opsaudit"
 version = "0.1.0"
 description = "Audit disparities in operational ML systems"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [{name = "Ram Charan Polisetti"}]
+keywords = ["ai governance", "algorithmic fairness", "operations analytics", "responsible ai", "supply chain"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = ["pandas>=2.0", "numpy>=1.24", "click>=8.0", "jinja2>=3.0", "pyyaml>=6.0"]
+
+[project.urls]
+Homepage = "https://github.com/ram-polisetti/opsaudit"
+Repository = "https://github.com/ram-polisetti/opsaudit"
+Issues = "https://github.com/ram-polisetti/opsaudit/issues"
+Changelog = "https://github.com/ram-polisetti/opsaudit/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov"]
+release = ["build>=1.2", "twine>=5.1"]
 
 [project.scripts]
 opsaudit = "opsaudit.cli:main"
