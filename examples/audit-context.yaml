@@ -1,0 +1,11 @@
+# Keep this manifest compact and non-sensitive. Do not put raw records,
+# credentials, employee identifiers, or customer data in it.
+system_name: route-priority-assignment
+model_version: 2026.1
+intended_use: Assign premium delivery routes
+decision_owner: operations-planning
+audit_owner: responsible-ai-review
+decision_date_range: 2026-09-01 to 2026-09-14
+group_definition: Delivery zone
+threshold_policy_version: 1.0
+review_decision: Hold pending investigation

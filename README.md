@@ -8,13 +8,19 @@ opsaudit is a practical, open-source Python toolkit for checking whether operati
 
 ## Installation
 
-Install the validated `v0.1.0` package directly from GitHub:
+Install the current development version directly from GitHub:
+
+```bash
+pip install "git+https://github.com/ram-polisetti/opsaudit.git"
+```
+
+The validated `v0.1.0` release remains available at the matching Git tag:
 
 ```bash
 pip install "git+https://github.com/ram-polisetti/opsaudit.git@v0.1.0"
 ```
 
-PyPI publication is prepared but intentionally pending PyPI account setup. Until then, use the GitHub install above or clone the repository for local development:
+PyPI publication is prepared but intentionally pending PyPI account setup. Until then, use a GitHub install or clone the repository for local development:
 
 ```bash
 git clone https://github.com/ram-polisetti/opsaudit.git
@@ -35,6 +41,37 @@ opsaudit gate --report biased_report.json # expect: FAIL, exit code 1
 ```
 
 The `generate` command creates only local, synthetic data. `audit` writes matching `.md`, `.html`, and `.json` reports. The gate returns exit code 0 for a passing result and 1 for a failing result, so it can be used directly in CI.
+
+## Evidence-quality options
+
+Use an audit-context manifest to preserve decision metadata with the report. The manifest is for compact review context—not raw records, credentials, or personal data.
+
+```bash
+opsaudit audit \
+  --data dispatch.csv \
+  --truth on_time \
+  --pred priority_route \
+  --group group \
+  --context examples/audit-context.yaml \
+  --min-group-n 30 \
+  --bootstrap 500 \
+  --out evidence_report
+```
+
+- Repeat `--group` to form an intersectional label, such as `--group delivery_zone --group contract_type`.
+- `--min-group-n` records a review condition when a group is too small for the configured policy.
+- `--bootstrap 0` is the default; use a bounded value from `1` to `1000` for deterministic 95% stratified bootstrap intervals.
+- The Markdown, HTML, and JSON reports preserve context, evidence-quality conditions, and intervals.
+
+The deployment gate now has an explicit three-state contract:
+
+| status | exit code | meaning |
+| --- | ---: | --- |
+| `PASS` | 0 | Configured checks passed and no review condition was recorded. |
+| `FAIL` | 1 | One or more configured disparity checks failed. |
+| `REVIEW` | 2 | Evidence is insufficient or uncertain; a human decision is required. |
+
+Most CI systems treat exit code `2` as blocking. If a team deliberately wants a warning-only exception, it should handle exit `2` explicitly in its pipeline rather than weaken the default gate.
 
 ## Metrics glossary
 
@@ -72,7 +109,7 @@ The biased dispatch quickstart intentionally produces a failed report, including
 4. Decide whether to remediate, change an approved policy threshold, or hold deployment; document the owner and rationale.
 5. Rerun the audit after remediation and retain both reports as decision evidence.
 
-The current CLI exit contract is `0` for `PASS` and `1` for `FAIL`. A future `REVIEW` state will use exit code `2`, indicating that the gate cannot make a reliable decision and should block CI unless a pipeline explicitly handles that condition.
+The gate uses exit `0` for `PASS`, `1` for `FAIL`, and `2` for `REVIEW`. A review condition means the tool cannot make a reliable release recommendation without a human decision.
 
 ## Project status and roadmap
 
@@ -82,14 +119,14 @@ The current CLI exit contract is `0` for `PASS` and `1` for `FAIL`. A future `RE
 - GitHub Actions tests package builds and PyPI metadata; the `v0.1.0` tag and draft release are prepared.
 - Cite the project using [CITATION.cff](CITATION.cff), and see [CHANGELOG.md](CHANGELOG.md) for release contents.
 
-### Next: stronger audit evidence
+### v0.1.1 — development on `main`
 
-The next release should prioritize decision context and evidence quality over more surface area:
+This development release prioritizes decision context and evidence quality over more surface area:
 
-- An audit-context manifest for the system, model version, intended use, decision/audit owners, decision period, threshold-policy version, reviewer decision, and remediation notes.
-- Configurable minimum-group-size warnings and an explicit warning when every decision is negative.
+- Audit-context manifests for the system, model version, intended use, decision/audit owners, decision period, threshold policy, reviewer decision, and remediation notes.
+- Configurable minimum-group-size review conditions and an explicit warning when every decision is negative.
 - Optional, capped bootstrap confidence intervals for selection rates and disparity metrics.
-- A `REVIEW` result for insufficient evidence, with the documented exit-code contract: `0` = pass, `1` = fail, `2` = review.
+- A `REVIEW` result for insufficient evidence, with exit `0` = pass, `1` = fail, and `2` = review.
 
 ### Later: intersectional analysis
 
@@ -98,6 +135,12 @@ Support combined group definitions—such as region plus contract type—only af
 ## Intentional non-goals
 
 opsaudit deliberately does not provide a dashboard, web application, model training, model selection, live drift monitoring, telemetry, legal compliance certification, real company data, or client-branded examples. The project stays focused on explainable, reproducible operational AI-audit evidence.
+
+## Learn and present the project
+
+- [Operational AI Audit Playbook](docs/OPERATIONAL_AI_AUDIT_PLAYBOOK.md) — the practical review workflow behind an audit.
+- [Three-minute demo script](docs/DEMO_SCRIPT.md) — a clean-pass versus biased-fail walkthrough.
+- [Evidence-quality design](docs/EVIDENCE_QUALITY_DESIGN.md) — the `PASS`/`FAIL`/`REVIEW` contract and technical decisions.
 
 ## Development
 
