@@ -35,3 +35,23 @@ def test_save_report_writes_all_formats_and_json_round_trips(tmp_path):
     assert all(path.exists() for path in paths)
     loaded = json.loads(paths[-1].read_text())
     assert isinstance(AuditResult.from_dict(loaded), AuditResult)
+
+
+def test_reports_include_context_review_and_bootstrap_evidence():
+    result = audit_disparities(
+        [1, 0, 1, 0],
+        [1, 0, 1, 0],
+        ["A", "A", "B", "B"],
+        min_group_n=3,
+        bootstrap=10,
+        context={"system_name": "dispatch"},
+    )
+
+    markdown = to_markdown(result)
+    html = to_html(result)
+
+    assert "## Audit context" in markdown
+    assert "minimum_group_size" in markdown
+    assert "Bootstrap confidence intervals" in markdown
+    assert "Audit context" in html
+    assert "minimum_group_size" in html

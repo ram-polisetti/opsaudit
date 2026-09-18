@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.1.1 — Unreleased
+
+### Added
+
+- Flat YAML audit-context manifests, preserved in Markdown, HTML, and JSON audit evidence.
+- Configurable minimum-group-size review conditions and an all-negative-decision review warning.
+- Optional, capped, deterministic stratified bootstrap confidence intervals.
+- Three-state deployment-gate status: `PASS` (exit 0), `FAIL` (exit 1), and `REVIEW` (exit 2).
+- Repeated `--group` options for intersectional group labels.
+- Operational audit playbook, demo script, and v0.1.1 evidence-quality design documentation.
+
 ## 0.1.0 — 2026-09-18
 
 ### Added
