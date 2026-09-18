@@ -184,9 +184,9 @@ def audit_disparities(
     )
     # Import at call time: gate imports AuditResult, so module-level import would
     # create a circular dependency.
-    from .gate import DEFAULT_THRESHOLDS
+    from .gate import _merge_thresholds
 
-    active_thresholds = DEFAULT_THRESHOLDS if thresholds is None else thresholds
+    active_thresholds = _merge_thresholds(thresholds)
     result.flags = _build_flags(result, active_thresholds)
     return result
 
