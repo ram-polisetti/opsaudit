@@ -121,7 +121,7 @@ def to_html(result: AuditResult) -> str:
         }
         for group in result.groups
     ]
-    return Template(HTML_TEMPLATE).render(
+    return Template(HTML_TEMPLATE, autoescape=True).render(
         generated=_utc_timestamp(),
         result=result,
         groups=groups,

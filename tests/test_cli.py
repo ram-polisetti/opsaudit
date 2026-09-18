@@ -49,6 +49,35 @@ def test_audit_writes_all_report_formats(tmp_path):
     assert (tmp_path / "report.json").exists()
 
 
+def test_audit_without_prediction_skips_error_rate_metrics(tmp_path):
+    runner = CliRunner()
+    csv_path = tmp_path / "dispatch.csv"
+    report_prefix = tmp_path / "outcome-rates"
+    assert runner.invoke(
+        main,
+        ["generate", "--scenario", "dispatch", "--n", "50", "--out", str(csv_path)],
+    ).exit_code == 0
+
+    result = runner.invoke(
+        main,
+        [
+            "audit",
+            "--data",
+            str(csv_path),
+            "--truth",
+            "on_time",
+            "--group",
+            "group",
+            "--out",
+            str(report_prefix),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "prediction column not provided; skipping error-rate metrics" in result.output
+    assert "n/a" in (tmp_path / "outcome-rates.md").read_text()
+
+
 def test_gate_exits_zero_for_clean_report_and_one_for_biased_report(tmp_path):
     runner = CliRunner()
     for bias, expected_exit_code in [(0.0, 0), (0.5, 1)]:

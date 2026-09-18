@@ -111,5 +111,7 @@ def _outcome_rate_result(y_true: pd.Series, groups: pd.Series) -> AuditResult:
 def _load_thresholds(path: Path) -> dict[str, dict[str, float]]:
     """Load and validate a YAML threshold override file."""
     loaded: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if loaded is None:
+        raise ValueError("thresholds YAML must contain a mapping of checks to rules")
     _merge_thresholds(loaded)
     return loaded
