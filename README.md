@@ -1,18 +1,26 @@
 # opsaudit
 
-![CI](assets/ci.svg) ![Python 3.10 or newer](assets/python.svg) ![Apache-2.0 license](assets/license.svg)
+![CI](https://github.com/ram-polisetti/opsaudit/actions/workflows/ci.yml/badge.svg?branch=main) ![Python 3.10 or newer](assets/python.svg) ![Apache-2.0 license](assets/license.svg)
 
-opsaudit is a practical, open-source Python toolkit for checking whether operational ML decisions—such as dispatch, routing, demand forecasts, and warehouse staffing—produce materially different outcomes across groups. It is built by an operator, for operators: generate a reproducible scenario, measure the disparities, save a reviewable report, and use the gate in a release workflow.
+> **A practical pre-deployment fairness and governance check for operational ML decisions.**
+
+opsaudit is a practical, open-source Python toolkit for checking whether operational ML decisions—such as dispatch, routing, demand forecasts, and warehouse staffing—produce materially different outcomes across groups. It is built by an operator, for operators: generate a reproducible scenario, measure the disparities, save a reviewable report, and use the gate in a release workflow. It helps teams identify disparity signals, document them, and decide what must be investigated before deployment; it does not claim to certify a system as fair.
 
 ## Installation
 
-Install the published package:
+Install the validated `v0.1.0` package directly from GitHub:
 
 ```bash
-pip install opsaudit
+pip install "git+https://github.com/ram-polisetti/opsaudit.git@v0.1.0"
 ```
 
-For local development, clone the repository and use `pip install -e .[dev]` instead.
+PyPI publication is prepared but intentionally pending PyPI account setup. Until then, use the GitHub install above or clone the repository for local development:
+
+```bash
+git clone https://github.com/ram-polisetti/opsaudit.git
+cd opsaudit
+pip install -e .[dev]
+```
 
 ## Quickstart
 
@@ -44,9 +52,15 @@ The `generate` command creates only local, synthetic data. `audit` writes matchi
 
 opsaudit connects practical evidence to the NIST AI Risk Management Framework at the function level: synthetic scenarios help **Map** contexts, disparity checks **Measure** risk, the deployment gate helps **Manage** release decisions, and saved reports support **Govern** oversight. See [rmf.py](src/opsaudit/rmf.py) for the complete mapping; it intentionally does not claim RMF subcategory numbers.
 
-## Interpret results responsibly
+## What this audit can and cannot tell you
 
-opsaudit is a screening and documentation tool, not a fairness certification. A passing gate means the configured checks passed for the supplied data and thresholds; it does not prove that a system is fair. Before acting, verify group definitions and sample sizes, review data and outcome-label quality, and investigate operational conditions that may affect outcomes. Record the reviewer, decision, and rationale alongside the report.
+opsaudit is a screening and documentation tool, not a fairness certification. A passing gate means the configured checks passed for the supplied data and thresholds; it does not prove that a system is fair.
+
+- Treat the disparate-impact ratio and other thresholds as investigation signals, not universal decision rules.
+- Check group definitions and sample sizes before drawing conclusions; small groups can produce noisy rates.
+- Review data and outcome-label quality. For example, on-time delivery can be affected by route difficulty, staffing, infrastructure, and package mix—not just a decision model.
+- Use group fields only for a legitimate audit purpose, with appropriate access controls and accountable review.
+- Record the reviewer, decision, rationale, and remediation evidence alongside the report.
 
 ## Interpreting a failed gate
 
@@ -59,6 +73,31 @@ The biased dispatch quickstart intentionally produces a failed report, including
 5. Rerun the audit after remediation and retain both reports as decision evidence.
 
 The current CLI exit contract is `0` for `PASS` and `1` for `FAIL`. A future `REVIEW` state will use exit code `2`, indicating that the gate cannot make a reliable decision and should block CI unless a pipeline explicitly handles that condition.
+
+## Project status and roadmap
+
+### v0.1.0 — available from GitHub
+
+- Deterministic dispatch and staffing scenarios, binary disparity metrics, Markdown/HTML/JSON reports, function-level NIST AI RMF mapping, and a CI-friendly deployment gate.
+- GitHub Actions tests package builds and PyPI metadata; the `v0.1.0` tag and draft release are prepared.
+- Cite the project using [CITATION.cff](CITATION.cff), and see [CHANGELOG.md](CHANGELOG.md) for release contents.
+
+### Next: stronger audit evidence
+
+The next release should prioritize decision context and evidence quality over more surface area:
+
+- An audit-context manifest for the system, model version, intended use, decision/audit owners, decision period, threshold-policy version, reviewer decision, and remediation notes.
+- Configurable minimum-group-size warnings and an explicit warning when every decision is negative.
+- Optional, capped bootstrap confidence intervals for selection rates and disparity metrics.
+- A `REVIEW` result for insufficient evidence, with the documented exit-code contract: `0` = pass, `1` = fail, `2` = review.
+
+### Later: intersectional analysis
+
+Support combined group definitions—such as region plus contract type—only after the minimum-sample and uncertainty work is in place. Intersectional analysis should report small-group limitations rather than overstate weak evidence.
+
+## Intentional non-goals
+
+opsaudit deliberately does not provide a dashboard, web application, model training, model selection, live drift monitoring, telemetry, legal compliance certification, real company data, or client-branded examples. The project stays focused on explainable, reproducible operational AI-audit evidence.
 
 ## Development
 
