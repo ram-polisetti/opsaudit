@@ -19,3 +19,5 @@ gate-data/
 
 # Phase 1 demo output (regenerated on each run)
 examples/agentic-audit-demo/phase1_evidence.jsonl
+# Phase 2 demo output (regenerated on each run)
+examples/agentic-audit-demo/phase2_evidence.jsonl

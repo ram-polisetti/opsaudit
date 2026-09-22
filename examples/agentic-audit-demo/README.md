@@ -36,3 +36,30 @@ targets plus the evidence log.
 
 Disparities in the mock targets are planted for the demo. The tabular
 audit is real.
+
+---
+
+# Phase 2 demo: probe generators
+
+`phase2_demo.py` exercises the three deterministic generators against a
+`TabularTarget` wrapping a toy classifier with a planted disparity (temp
+workers with < 24 months tenure are denied shifts everyone else gets):
+
+| generator | what it does |
+|---|---|
+| `counterfactual` | symmetric group-swapped pairs (symmetry verified by `check_symmetry`); the real `audit_disparities` must catch the planted gap |
+| `adversarial` | extreme numerics, unseen categories, null rows — the target must return outputs without crashing |
+| `metamorphic` | field reordering must not change the decision (`evaluate_metamorphic`) |
+
+Every probe, response, and computed metric lands in `phase2_evidence.jsonl`
+(an `EvidenceLog` transcript).
+
+## Run it
+
+```bash
+# from the repo root (package installed, e.g. pip install -e ".[dev,llm]")
+python examples/agentic-audit-demo/phase2_demo.py
+```
+
+No network is required. Expected output ends with
+`OK: planted disparity caught by deterministic metrics.` and exit code 0.
