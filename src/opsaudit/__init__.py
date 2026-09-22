@@ -14,6 +14,19 @@ from .gate_ci import (
     run_gate,
 )
 from .metrics import AuditResult, audit_disparities
+from .probes import (
+    BUILTIN_RELATIONS,
+    MetamorphicRelation,
+    Probe,
+    ProbeBatch,
+    check_equal_output,
+    check_symmetry,
+    evaluate_metamorphic,
+    generate_adversarial,
+    generate_counterfactuals,
+    generate_llm_assisted,
+    generate_metamorphic,
+)
 from .report import save_report
 from .rmf import RMF_MAPPING
 from .targets import (
@@ -48,5 +61,16 @@ __all__ = [
     "OpenAICompatTarget",
     "RagTarget",
     "TabularTarget",
+    "Probe",
+    "ProbeBatch",
+    "MetamorphicRelation",
+    "BUILTIN_RELATIONS",
+    "check_equal_output",
+    "check_symmetry",
+    "evaluate_metamorphic",
+    "generate_adversarial",
+    "generate_counterfactuals",
+    "generate_llm_assisted",
+    "generate_metamorphic",
     "__version__",
 ]
