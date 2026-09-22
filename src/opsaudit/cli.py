@@ -10,10 +10,20 @@ import click
 import pandas as pd
 import yaml
 
+from . import __version__
 from .context import load_context
 from .data import generate_dispatch, generate_staffing
 from .gate import _merge_thresholds, evaluate_gate_status
 from .metrics import AuditResult, audit_disparities
+from .provenance import (
+    build_provenance,
+    canonical_hash,
+    check_body_hash,
+    check_signoff_chain,
+    sha256_file,
+    signoff_prev_hash,
+    utc_now,
+)
 from .report import save_report
 
 
@@ -39,7 +49,21 @@ def generate(scenario: str, n: int, bias: float, seed: int, out: Path) -> None:
     frame = generator(n=n, bias_strength=bias, seed=seed)
     out.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(out, index=False)
+    provenance = build_provenance(
+        command="generate",
+        args={"scenario": scenario, "n": n, "bias": bias, "seed": seed},
+        seed=seed,
+        opsaudit_version=__version__,
+    )
+    provenance["output"] = {
+        "path": str(out),
+        "sha256": sha256_file(out),
+        "row_count": len(frame),
+    }
+    sidecar = out.parent / f"{out.stem}.provenance.json"
+    sidecar.write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
     click.echo(f"wrote {len(frame)} rows to {out}")
+    click.echo(f"wrote provenance sidecar to {sidecar}")
 
 
 @main.command()
@@ -89,7 +113,27 @@ def audit(
             bootstrap_seed=bootstrap_seed,
             context=audit_context,
         )
-    save_report(result, out)
+    gate_status, gate_findings = evaluate_gate_status(result)
+    provenance = build_provenance(
+        command="audit",
+        args={
+            "truth": truth,
+            "pred": pred,
+            "groups": list(group_columns),
+            "min_group_n": min_group_n,
+            "bootstrap": bootstrap,
+            "bootstrap_seed": bootstrap_seed,
+            "context_file": str(context) if context is not None else None,
+        },
+        seed=bootstrap_seed,
+        input_path=str(data),
+        input_sha256=sha256_file(data),
+        row_count=len(frame),
+        opsaudit_version=__version__,
+        gate={"status": gate_status, "findings": gate_findings},
+    )
+    save_report(result, out, provenance=provenance)
+    click.echo(f"gate status at audit time: {gate_status}")
     _print_audit_flags(result)
     for reason in result.review_reasons:
         click.echo(f"[REVIEW] {reason['code']}: {reason['message']}")
@@ -105,6 +149,165 @@ def gate(report: Path, thresholds: Path | None) -> None:
     status, findings = evaluate_gate_status(result, overrides)
     click.echo(json.dumps({"status": status, "findings": findings}))
     raise SystemExit({"pass": 0, "fail": 1, "review": 2}[status])
+
+
+@main.command()
+@click.option("--report", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--data", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--thresholds", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+def verify(report: Path, data: Path, thresholds: Path | None) -> None:
+    """Verify a report's provenance: data hash, body hash, sign-off chain, and deterministic re-run.
+
+    Exit 0 when every check passes; exit 1 with a clear reason otherwise.
+    """
+    document = json.loads(report.read_text(encoding="utf-8"))
+    checks: list[dict[str, Any]] = []
+    failures: list[str] = []
+
+    def record(name: str, passed: bool, detail: str = "") -> None:
+        checks.append({"check": name, "passed": passed, "detail": detail})
+        if not passed:
+            failures.append(f"{name}: {detail}")
+
+    provenance = document.get("provenance")
+    if not isinstance(provenance, dict):
+        record("provenance_present", False, "report has no provenance block (predates v0.1.1 provenance)")
+    else:
+        record("provenance_present", True)
+        expected_sha = (provenance.get("input") or {}).get("sha256")
+        actual_sha = sha256_file(data)
+        if expected_sha is None:
+            record("data_hash", False, "provenance block records no input hash")
+        elif actual_sha == expected_sha:
+            record("data_hash", True, f"sha256 matches ({actual_sha[:12]}…)")
+        else:
+            record(
+                "data_hash",
+                False,
+                "input data was modified after the audit "
+                f"(expected {expected_sha[:12]}…, got {actual_sha[:12]}…)",
+            )
+        expected_rows = (provenance.get("input") or {}).get("row_count")
+        frame = pd.read_csv(data)
+        if expected_rows is None:
+            record("row_count", False, "provenance block records no row count")
+        elif len(frame) == expected_rows:
+            record("row_count", True, f"{len(frame)} rows")
+        else:
+            record(
+                "row_count",
+                False,
+                f"row count changed: expected {expected_rows}, got {len(frame)}",
+            )
+
+        body_ok, body_reason = check_body_hash(document)
+        record("body_hash", body_ok, "" if body_ok else body_reason)
+
+        chain_ok, chain_reason = check_signoff_chain(document)
+        record("signoff_chain", chain_ok, "" if chain_ok else chain_reason)
+
+        try:
+            recomputed = _rerun_audit(document, frame)
+            recorded_metrics = {
+                key: value
+                for key, value in document.items()
+                if key not in ("provenance", "signoffs")
+            }
+            if recomputed.to_dict() == recorded_metrics:
+                record("deterministic_rerun", True, "metrics identical on re-run")
+            else:
+                record(
+                    "deterministic_rerun",
+                    False,
+                    "recomputed metrics differ from the recorded report — "
+                    "the report was edited after the audit",
+                )
+            overrides = _load_thresholds(thresholds) if thresholds is not None else None
+            rerun_status, _ = evaluate_gate_status(recomputed, overrides)
+            recorded_gate = provenance.get("gate") or {}
+            if thresholds is None and recorded_gate.get("status") == rerun_status:
+                record("gate_status", True, f"status {rerun_status} confirmed")
+            elif thresholds is None:
+                record(
+                    "gate_status",
+                    False,
+                    f"recorded gate status {recorded_gate.get('status')!r} does not "
+                    f"match recomputed {rerun_status!r}",
+                )
+            else:
+                record("gate_status", True, f"recomputed status with overrides: {rerun_status}")
+        except Exception as exc:  # noqa: BLE001 - verification must report, not crash
+            record("deterministic_rerun", False, f"re-run failed: {exc}")
+
+    summary = {"verified": not failures, "checks": checks}
+    click.echo(json.dumps(summary, indent=2))
+    raise SystemExit(0 if not failures else 1)
+
+
+@main.command()
+@click.option("--report", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--reviewer", required=True, help="Name of the human reviewer.")
+@click.option("--decision", type=click.Choice(["approve", "reject"]), required=True)
+@click.option("--note", default="", show_default=True)
+def signoff(report: Path, reviewer: str, decision: str, note: str) -> None:
+    """Append a human review record to a report (the escalation point for REVIEW gates).
+
+    Records are hash-chained to the report body and to each other; any later
+    edit is detectable with ``opsaudit verify``.
+    """
+    document = json.loads(report.read_text(encoding="utf-8"))
+    if not isinstance(document.get("provenance"), dict):
+        raise click.UsageError("report has no provenance block; cannot sign it")
+    body_ok, body_reason = check_body_hash(document)
+    if not body_ok:
+        raise click.UsageError(f"refusing to sign a tampered report: {body_reason}")
+    chain_ok, chain_reason = check_signoff_chain(document)
+    if not chain_ok:
+        raise click.UsageError(f"refusing to sign: {chain_reason}")
+    record = {
+        "reviewer": reviewer,
+        "decision": decision,
+        "note": note,
+        "timestamp_utc": utc_now(),
+        "prev_hash": signoff_prev_hash(document),
+    }
+    record["record_hash"] = canonical_hash(record)
+    document.setdefault("signoffs", []).append(record)
+    report.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    click.echo(
+        f"recorded {decision} by {reviewer} "
+        f"(sign-off #{len(document['signoffs'])} on this report)"
+    )
+
+
+def _rerun_audit(document: dict[str, Any], frame: pd.DataFrame) -> AuditResult:
+    """Deterministically re-run the audit described by a report's provenance."""
+    provenance = document["provenance"]
+    args = provenance["run"]["args"]
+    truth = args["truth"]
+    pred = args.get("pred")
+    group_columns = tuple(args["groups"])
+    _require_columns(frame, [truth, *group_columns] + ([pred] if pred else []))
+    labels = _group_labels(frame, group_columns)
+    context = dict(document.get("context", {}))
+    if pred is None:
+        return _outcome_rate_result(
+            frame[truth],
+            labels,
+            min_group_n=args.get("min_group_n"),
+            bootstrap=args.get("bootstrap", 0),
+            bootstrap_seed=args.get("bootstrap_seed", 42),
+            context=context,
+        )
+    return audit_disparities(
+        frame[truth],
+        frame[pred],
+        labels,
+        min_group_n=args.get("min_group_n"),
+        bootstrap=args.get("bootstrap", 0),
+        bootstrap_seed=args.get("bootstrap_seed", 42),
+        context=context,
+    )
 
 
 def _print_audit_flags(result: AuditResult) -> None:

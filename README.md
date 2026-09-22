@@ -42,6 +42,23 @@ opsaudit gate --report biased_report.json # expect: FAIL, exit code 1
 
 The `generate` command creates only local, synthetic data. `audit` writes matching `.md`, `.html`, and `.json` reports. The gate returns exit code 0 for a passing result and 1 for a failing result, so it can be used directly in CI.
 
+## Provenance, verification, and human sign-off
+
+Every `audit` run embeds a tamper-evident `provenance` block in the report JSON: SHA-256 of the input data, row count, opsaudit version and git SHA, the full resolved CLI arguments, the random seed, a UTC timestamp, the Python version, and the gate verdict computed at audit time. `generate` writes a matching provenance sidecar (`<name>.provenance.json`) next to its CSV.
+
+```bash
+opsaudit verify --report report.json --data dispatch.csv
+# {"verified": true, "checks": [...]} — exit 0
+
+opsaudit signoff --report report.json --reviewer "A. Operator" \
+  --decision approve --note "Reviewed FPR gap; acceptable for this lane."
+# recorded approve by A. Operator (sign-off #1 on this report)
+
+opsaudit verify --report report.json --data dispatch.csv  # still exit 0
+```
+
+`verify` checks six things: the provenance block exists, the data hash matches, the row count matches, the report body hash matches, the sign-off hash chain is intact, and a deterministic re-run of the audit reproduces the recorded metrics and gate status. Any edit — to the data, the metrics, or a sign-off note — fails verification with a named reason (exit 1). Sign-offs are hash-chained to the report body and to each other, so a reviewer's `reject` on a failing gate cannot be quietly rewritten to `approve`. See `docs/PROVENANCE.md` for the full design, threat model, and a worked validation on the real UCI Adult dataset.
+
 ## Evidence-quality options
 
 Use an audit-context manifest to preserve decision metadata with the report. The manifest is for compact review context—not raw records, credentials, or personal data.
@@ -127,6 +144,7 @@ This development release prioritizes decision context and evidence quality over 
 - Configurable minimum-group-size review conditions and an explicit warning when every decision is negative.
 - Optional, capped bootstrap confidence intervals for selection rates and disparity metrics.
 - A `REVIEW` result for insufficient evidence, with exit `0` = pass, `1` = fail, and `2` = review.
+- Tamper-evident provenance: `provenance` blocks in report JSON, `opsaudit verify` for data/body/sign-off/deterministic-re-run checks, and `opsaudit signoff` for hash-chained human review records (see `docs/PROVENANCE.md`).
 
 ### Later: intersectional analysis
 

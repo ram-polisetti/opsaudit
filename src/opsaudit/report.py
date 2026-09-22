@@ -10,6 +10,7 @@ from jinja2 import Template
 
 from . import __version__
 from .metrics import AuditResult
+from .provenance import attach_body_hash
 from .rmf import RMF_MAPPING, rmf_section
 
 
@@ -174,10 +175,14 @@ def to_html(result: AuditResult) -> str:
     )
 
 
-def save_report(result: AuditResult, path: str | Path) -> list[Path]:
+def save_report(
+    result: AuditResult, path: str | Path, provenance: dict | None = None
+) -> list[Path]:
     """Write Markdown, HTML, and JSON reports with a shared path prefix.
 
-    Parent directories are created when needed.
+    Parent directories are created when needed. When ``provenance`` is given,
+    the JSON report embeds it plus an empty ``signoffs`` list, and the
+    tamper-evident body hash is computed over the JSON payload.
 
     Example:
         >>> [item.suffix for item in save_report(AuditResult([], 0, 0.0, 1.0, None, None, []), "/tmp/opsaudit-example")]
@@ -188,7 +193,12 @@ def save_report(result: AuditResult, path: str | Path) -> list[Path]:
     files = [Path(f"{prefix}.md"), Path(f"{prefix}.html"), Path(f"{prefix}.json")]
     files[0].write_text(to_markdown(result), encoding="utf-8")
     files[1].write_text(to_html(result), encoding="utf-8")
-    files[2].write_text(json.dumps(result.to_dict(), indent=2) + "\n", encoding="utf-8")
+    payload = result.to_dict()
+    if provenance is not None:
+        payload["provenance"] = provenance
+        payload["signoffs"] = []
+        attach_body_hash(payload)
+    files[2].write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return files
 
 
