@@ -1,0 +1,45 @@
+name: disparity-gate
+
+# Dogfood: the opsaudit repo runs its own disparity gate on every PR that
+# touches the audit engine. This both demonstrates the action and guards the
+# gate logic itself against regressions — if a change to metrics.py or
+# gate_ci.py alters verdicts on the canonical dataset, the PR author sees it
+# here before merge.
+on:
+  pull_request:
+    paths:
+      - "src/opsaudit/**"
+      - ".github/actions/disparity-gate/**"
+      - ".opsaudit-gate.yml"
+      - ".github/workflows/disparity-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write # append verdicts to the opsaudit-audit-log branch
+  pull-requests: write # post the verdict comment
+  actions: write # upload the verdict/report artifact
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install opsaudit from this checkout
+        run: pip install .
+
+      - name: Generate the canonical audit dataset (deterministic)
+        run: |
+          opsaudit generate --scenario dispatch \
+            --n 5000 --bias 0.0 --seed 42 \
+            --out gate-data/decisions.csv
+
+      - name: Run the disparity gate
+        uses: ./.github/actions/disparity-gate
+        with:
+          config: .opsaudit-gate.yml
+          opsaudit-source: local
