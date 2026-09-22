@@ -124,6 +124,11 @@ runs:
         set -euo pipefail
         BRANCH="${{ inputs.audit-log-branch }}"
         export OUT_DIR="${{ inputs.out-dir }}"
+        # Remember where we started: this step switches branches to append the
+        # verdict, and must restore the original checkout afterwards. Without
+        # the restore, the runner's post-step cannot re-resolve this local
+        # action's action.yml and the job fails after the verdict passed.
+        ORIG_SHA=$(git rev-parse HEAD)
         git config user.name "opsaudit-gate[bot]"
         git config user.email "opsaudit-gate[bot]@users.noreply.github.com"
         if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
@@ -154,6 +159,10 @@ runs:
           echo "push conflict, rebasing (attempt $attempt)"
           git pull --rebase origin "$BRANCH"
           sleep "$attempt"
+        done
+        # Restore the original checkout so later steps and the runner's
+        # post-phase resolve files (including this action) correctly.
+        git checkout -q "$ORIG_SHA"
         done
 
     - name: Enforce the verdict
