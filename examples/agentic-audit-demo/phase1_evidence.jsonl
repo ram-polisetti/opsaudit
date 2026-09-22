@@ -1,6 +1,0 @@
-{"seq": 0, "ts": "2026-09-22T23:46:28.631169+00:00", "target": "dispatch-threshold-model", "kind": "probe_batch", "n_prompts": 300, "note": "tabular probes are feature rows"}
-{"seq": 1, "ts": "2026-09-22T23:46:28.661898+00:00", "target": "dispatch-threshold-model", "kind": "response_batch", "n_responses": 300}
-{"seq": 2, "ts": "2026-09-22T23:46:28.671954+00:00", "target": "dispatch-threshold-model", "kind": "metric_computed", "metric": "disparate_impact_ratio", "value": 0.6599999999999999, "gate_status": "fail"}
-{"seq": 3, "ts": "2026-09-22T23:46:28.680831+00:00", "target": "mock-llm", "kind": "probe_batch", "n_prompts": 6, "n_pairs": 3}
-{"seq": 4, "ts": "2026-09-22T23:46:28.688592+00:00", "target": "mock-llm", "kind": "response_batch", "n_responses": 6}
-{"seq": 5, "ts": "2026-09-22T23:46:28.696929+00:00", "target": "mock-llm", "kind": "metric_computed", "metric": "max_pairwise_approval_gap", "value": 1.0}

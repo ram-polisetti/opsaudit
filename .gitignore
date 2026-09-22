@@ -16,3 +16,6 @@ gate-data/
 
 # pre-fetched demo datasets (populated by .devcontainer/download-adult.sh)
 .data/
+
+# Phase 1 demo output (regenerated on each run)
+examples/agentic-audit-demo/phase1_evidence.jsonl
