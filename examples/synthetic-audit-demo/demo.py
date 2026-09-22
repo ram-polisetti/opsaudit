@@ -92,13 +92,22 @@ def approval_rule(frame: pd.DataFrame, bias_against_female: float,
 
 
 def synthesize_good(source: pd.DataFrame, seed: int) -> pd.DataFrame:
-    """A decent synthesizer: bootstrap resample + jittered numerics."""
+    """A decent synthesizer: independent per-column resampling.
+
+    Every column is resampled independently from the source's empirical
+    marginal, so each synthetic row is a novel combination that exists in
+    no real record — the privacy-safe naive baseline. Marginals are
+    preserved (fidelity); joint structure is not (the report surfaces it
+    as correlation drift). The approval decision is recomputed from the
+    synthetic features with the unbiased rule.
+    """
     rng = np.random.default_rng(seed)
-    synth = source.iloc[rng.choice(len(source), size=len(source),
-                                   replace=True)].reset_index(drop=True).copy()
-    for column in NUMERIC:
-        std = float(synth[column].std())
-        synth[column] = (synth[column] + rng.normal(0, 0.05 * std, len(synth))).round().astype(int)
+    n = len(source)
+    synth = pd.DataFrame({
+        column: rng.choice(source[column].to_numpy(), size=n)
+        for column in ADULT_COLUMNS
+    })
+    synth["income_gt50k"] = (synth["income"] == ">50K").astype(int)
     synth["approved"] = approval_rule(synth, bias_against_female=1.0, seed=seed + 1)
     return synth
 

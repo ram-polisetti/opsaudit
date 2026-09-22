@@ -113,6 +113,38 @@ def test_fidelity_flags_vanished_categories():
     assert any(f["code"] == "vanished_categories" for f in out["findings"])
 
 
+def test_vanished_singleton_is_recorded_but_does_not_escalate():
+    # Losing a category that appears once in the source is expected
+    # sampling noise under any resampling-based synthesizer: the finding
+    # is recorded, but the verdict must not escalate.
+    src = pd.DataFrame({"g": ["a"] * 999 + ["rare"], "x": list(range(1000))})
+    syn = pd.DataFrame({"g": ["a"] * 1000, "x": list(range(1000))})
+    out = audit_fidelity(src, syn, ["x"], ["g"])
+    finding = next(f for f in out["findings"] if f["code"] == "vanished_categories")
+    assert finding["categories"] == ["rare"]
+    assert finding["max_source_support"] == pytest.approx(0.001)
+    assert out["verdict"] == "pass"
+
+
+def test_vanished_major_category_escalates_to_review():
+    # Losing a well-represented category is a utility failure even when the
+    # aggregate fidelity score alone would pass.
+    n = 1000
+    src = pd.DataFrame({
+        "x1": range(n), "x2": range(n), "x3": range(n),
+        "g": ["a"] * 700 + ["b"] * 300,
+    })
+    syn = pd.DataFrame({
+        "x1": range(n), "x2": range(n), "x3": range(n),
+        "g": ["a"] * n,
+    })
+    out = audit_fidelity(src, syn, ["x1", "x2", "x3"], ["g"])
+    assert out["fidelity_score"] >= 0.90  # score alone would pass
+    finding = next(f for f in out["findings"] if f["code"] == "vanished_categories")
+    assert finding["max_source_support"] == pytest.approx(0.3)
+    assert out["verdict"] == "review"
+
+
 def test_correlation_drift_none_with_single_numeric():
     src, _ = _frames()
     out = audit_fidelity(src, src.copy(), ["packages_assigned"], [])
@@ -167,6 +199,21 @@ def test_privacy_is_deterministic_for_fixed_seed():
     first = audit_privacy(src, syn, ["packages_assigned"], ["group"], seed=7)
     second = audit_privacy(src, syn, ["packages_assigned"], ["group"], seed=7)
     assert first["privacy_risk"] == second["privacy_risk"]
+
+
+def test_privacy_fail_carries_explanatory_finding():
+    # A fail driven by the distance-ratio signal must be explained by a
+    # finding, not just a number.
+    src, _ = _frames(n=400)
+    rng = np.random.default_rng(9)
+    syn = src.copy()
+    syn["packages_assigned"] = syn["packages_assigned"] + rng.integers(-1, 2, size=len(syn))
+    out = audit_privacy(src, syn, ["packages_assigned"],
+                        ["group", "on_time", "priority_route"], seed=7)
+    assert out["verdict"] == "fail"
+    finding = next(f for f in out["findings"]
+                   if f["code"] == "close_synthetic_neighbors")
+    assert finding["distance_ratio_risk"] == pytest.approx(out["distance_ratio_risk"])
 
 
 # ---------------------------------------------------------------------------

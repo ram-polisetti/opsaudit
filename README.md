@@ -201,6 +201,33 @@ external immutable storage — that mirroring is out of scope here.
 - Fork-PR setups need the `pull_request_target` pattern (the bundled
   workflow uses `pull_request`); see the example for the permission notes.
 
+## Synthetic data auditor
+
+Before synthetic data is allowed to train anything, `audit-synthetic` evaluates it
+against the source data on three axes and issues a go/no-go verdict (exit 0/1/2
+for pass/fail/review):
+
+- **Fidelity** — per-column distribution similarity (KS for numerics, total
+  variation distance for categoricals), correlation drift, marginal coverage.
+  Losing a well-represented source category escalates to at least `review`.
+- **Privacy** — membership-inference attack surface: nearest-neighbor distance
+  ratios, memorization rate, and exact-duplicate excess over chance collisions.
+- **Bias amplification** — runs the real `audit_disparities` on source and
+  synthetic and compares disparate impact, parity gaps, and TPR/FPR gaps,
+  with bootstrap confidence-interval separation so sampling noise is not
+  mistaken for new bias.
+
+```bash
+opsaudit audit-synthetic --source source.csv --synthetic synthetic.csv \
+  --config synthetic-audit.yml --out synthetic_report.json
+```
+
+See [docs/SYNTHETICS.md](docs/SYNTHETICS.md) for the full methodology and
+limitations, and
+[examples/synthetic-audit-demo/demo.py](examples/synthetic-audit-demo/demo.py)
+for a worked UCI Adult example (a privacy-safe synthetic set passes; a
+memorizing, biased one fails on privacy and bias).
+
 ## Project status and roadmap
 
 ### v0.1.0 — available from GitHub

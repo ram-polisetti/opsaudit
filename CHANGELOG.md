@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Synthetic data auditor (`opsaudit.synthetics` + `opsaudit audit-synthetic` CLI): three-axis go/no-go evaluation of synthetic datasets against their source data — statistical fidelity (per-column KS/TVD, correlation drift, marginal coverage, support-aware `vanished_categories` escalation), privacy attack-surface probe (distance-ratio risk, memorization rate, exact-duplicate excess over chance), and bias amplification via the real `audit_disparities` on both frames with bootstrap-CI separation guards. YAML config with per-axis threshold overrides; JSON report with provenance block; exits 0/1/2 for pass/fail/review. Methodology and limitations in `docs/SYNTHETICS.md`; worked UCI Adult demo in `examples/synthetic-audit-demo/` (devcontainer pre-fetches the dataset); 33 tests in `tests/test_synthetics.py`.
 - Flat YAML audit-context manifests, preserved in Markdown, HTML, and JSON audit evidence.
 - Configurable minimum-group-size review conditions and an all-negative-decision review warning.
 - Optional, capped, deterministic stratified bootstrap confidence intervals.
