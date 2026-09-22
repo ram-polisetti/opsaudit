@@ -25,6 +25,7 @@ from .provenance import (
     utc_now,
 )
 from .report import save_report
+from .synthetics import SyntheticAuditConfig, audit_synthetic
 
 
 @click.group()
@@ -411,3 +412,83 @@ def _load_thresholds(path: Path) -> dict[str, dict[str, float]]:
         raise ValueError("thresholds YAML must contain a mapping of checks to rules")
     _merge_thresholds(loaded)
     return loaded
+
+
+@main.command("audit-synthetic")
+@click.option("--source", "source_path", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--synthetic", "synthetic_path", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--config", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--bootstrap", type=click.IntRange(0, 1000), default=200, show_default=True)
+@click.option("--bootstrap-seed", type=int, default=42, show_default=True)
+@click.option("--out", type=click.Path(path_type=Path), required=True)
+def audit_synthetic_cmd(
+    source_path: Path,
+    synthetic_path: Path,
+    config: Path,
+    bootstrap: int,
+    bootstrap_seed: int,
+    out: Path,
+) -> None:
+    """Audit a synthetic dataset against its source on three axes.
+
+    Evaluates statistical fidelity, membership-inference privacy risk, and
+    bias amplification, then writes a JSON go/no-go report. Exits 0 for
+    pass, 1 for fail, 2 for human review.
+    """
+    try:
+        raw_config: Any = yaml.safe_load(config.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise click.UsageError(f"could not parse config YAML: {exc}") from exc
+    try:
+        audit_config = SyntheticAuditConfig.from_dict(raw_config)
+    except ValueError as exc:
+        raise click.UsageError(f"invalid synthetic-audit config: {exc}") from exc
+
+    source = pd.read_csv(source_path)
+    synthetic = pd.read_csv(synthetic_path)
+    try:
+        report = audit_synthetic(
+            source,
+            synthetic,
+            audit_config,
+            bootstrap=bootstrap,
+            bootstrap_seed=bootstrap_seed,
+        )
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+
+    report["provenance"] = build_provenance(
+        command="audit-synthetic",
+        args={
+            "source": str(source_path),
+            "synthetic": str(synthetic_path),
+            "config": str(config),
+            "bootstrap": bootstrap,
+            "bootstrap_seed": bootstrap_seed,
+        },
+        seed=audit_config.seed,
+        opsaudit_version=__version__,
+    )
+    report["provenance"]["inputs"] = {
+        "source": {
+            "path": str(source_path),
+            "sha256": sha256_file(source_path),
+            "row_count": len(source),
+        },
+        "synthetic": {
+            "path": str(synthetic_path),
+            "sha256": sha256_file(synthetic_path),
+            "row_count": len(synthetic),
+        },
+    }
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    click.echo(f"synthetic-data verdict: {report['verdict']}")
+    for axis in ("fidelity", "privacy", "bias"):
+        axis_result = report["axes"][axis]
+        click.echo(f"[{axis_result['verdict'].upper()}] {axis}")
+        for finding in axis_result["findings"]:
+            click.echo(f"  - {finding['code']}: {finding['message']}")
+    click.echo(f"wrote JSON report to {out}")
+    raise SystemExit({"pass": 0, "fail": 1, "review": 2}[report["verdict"]])
