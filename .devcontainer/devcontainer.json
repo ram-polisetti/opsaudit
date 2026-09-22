@@ -1,0 +1,17 @@
+{
+  "name": "opsaudit",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {},
+  "containerEnv": {
+    // Path to the pre-fetched UCI Adult demo dataset (see download-adult.sh).
+    // examples/synthetic-audit-demo/demo.py reads this and skips downloading.
+    "ADULT_DATA": "${containerWorkspaceFolder}/.data/adult.data"
+  },
+  "onCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/download-adult.sh",
+  "postCreateCommand": "pip install -e .",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  }
+}
