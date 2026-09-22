@@ -4,6 +4,7 @@ __version__ = "0.1.1"
 
 from .context import load_context
 from .data import generate_dispatch, generate_staffing
+from .evidence import EvidenceLog
 from .gate import DEFAULT_THRESHOLDS, evaluate_gate, evaluate_gate_status
 from .gate_ci import (
     append_verdict_log,
@@ -15,6 +16,14 @@ from .gate_ci import (
 from .metrics import AuditResult, audit_disparities
 from .report import save_report
 from .rmf import RMF_MAPPING
+from .targets import (
+    HuggingFaceTarget,
+    OllamaTarget,
+    OpenAICompatTarget,
+    RagTarget,
+    TabularTarget,
+    Target,
+)
 
 __all__ = [
     "audit_disparities",
@@ -32,5 +41,12 @@ __all__ = [
     "decide_exit",
     "render_verdict_markdown",
     "append_verdict_log",
+    "EvidenceLog",
+    "Target",
+    "HuggingFaceTarget",
+    "OllamaTarget",
+    "OpenAICompatTarget",
+    "RagTarget",
+    "TabularTarget",
     "__version__",
 ]
