@@ -61,6 +61,12 @@ _DEFAULT_THRESHOLDS: dict[str, dict[str, float]] = {
 #: Row cap for the pairwise-distance privacy probe (keeps memory bounded).
 _PRIVACY_SAMPLE_N = 2000
 
+#: A vanished category only escalates the fidelity verdict when it held at
+#: least this share of source rows. Losing a singleton (or near-singleton)
+#: to sampling noise is expected under any resampling-based synthesizer, so
+#: the finding is recorded but does not force human review below this line.
+_VANISHED_MIN_SUPPORT = 0.01
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -318,11 +324,17 @@ def audit_fidelity(
                 }
             )
         if entry.get("vanished_categories"):
+            source_values = source[column].astype(str)
+            support = {
+                category: float((source_values == category).mean())
+                for category in entry["vanished_categories"]
+            }
             findings.append(
                 {
                     "code": "vanished_categories",
                     "column": column,
                     "categories": entry["vanished_categories"],
+                    "max_source_support": max(support.values()),
                     "message": f"column {column!r} lost categories present in source: "
                     f"{', '.join(entry['vanished_categories'])}",
                 }
@@ -334,6 +346,17 @@ def audit_fidelity(
         verdict = "review"
     else:
         verdict = "fail"
+    if any(
+        f["code"] == "vanished_categories"
+        and f["max_source_support"] >= _VANISHED_MIN_SUPPORT
+        for f in findings
+    ):
+        # Losing a whole well-represented category is a utility failure
+        # even when the aggregate score looks fine: a downstream model
+        # never sees it. (Singleton losses are sampling noise and do not
+        # escalate.)
+        if _VERDICT_ORDER[verdict] < _VERDICT_ORDER["review"]:
+            verdict = "review"
 
     return {
         "verdict": verdict,
@@ -540,6 +563,27 @@ def audit_privacy(
     privacy_risk = float(max(ratio_risk, memorization_rate, excess_duplicate_rate))
 
     findings: list[dict[str, Any]] = []
+    if ratio_risk > active["review_risk"]:
+        # The distance-ratio signal is the core of a distance-based
+        # membership-inference attack: it deserves its own finding so a
+        # fail/review verdict is never unexplained.
+        if median_src_syn > 0:
+            detail = (
+                f"synthetic rows sit {median_src_src / median_src_syn:.1f}x "
+                "closer to source rows than source rows sit to each other"
+            )
+        else:
+            detail = "synthetic rows sit exactly on source rows"
+        findings.append(
+            {
+                "code": "close_synthetic_neighbors",
+                "distance_ratio_risk": ratio_risk,
+                "median_source_to_synthetic": median_src_syn,
+                "median_source_to_source": median_src_src,
+                "message": detail
+                + " — the distance signal a membership-inference attack exploits",
+            }
+        )
     if excess_duplicate_rate > 0:
         findings.append(
             {
