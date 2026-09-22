@@ -163,7 +163,6 @@ runs:
         # Restore the original checkout so later steps and the runner's
         # post-phase resolve files (including this action) correctly.
         git checkout -q "$ORIG_SHA"
-        done
 
     - name: Enforce the verdict
       shell: bash
