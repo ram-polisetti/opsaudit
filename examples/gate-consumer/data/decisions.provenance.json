@@ -1,0 +1,26 @@
+{
+  "tool": "opsaudit",
+  "opsaudit_version": "0.1.1",
+  "code": {
+    "git_sha": "385266059eed838a723eb9490e4ce7368d8eed1c",
+    "git_dirty": true
+  },
+  "run": {
+    "command": "generate",
+    "args": {
+      "scenario": "dispatch",
+      "n": 2000,
+      "bias": 0.5,
+      "seed": 42
+    },
+    "seed": 42,
+    "timestamp_utc": "2026-09-22T01:15:07Z",
+    "python_version": "3.12.3"
+  },
+  "body_sha256": null,
+  "output": {
+    "path": "examples/gate-consumer/data/decisions.csv",
+    "sha256": "24ad0b753c4ed36ffe76d904d33a7c1ce6e6a5f1cdb7a072994dbfc64df17598",
+    "row_count": 2000
+  }
+}

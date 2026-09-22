@@ -1,0 +1,24 @@
+# Disparity-gate config for the opsaudit repo itself (dogfood).
+#
+# The gate-data/decisions.csv file is generated deterministically by
+# .github/workflows/disparity-gate.yml on every run:
+#   opsaudit generate --scenario dispatch --n 5000 --bias 0.0 --seed 42
+# With zero injected bias the gate passes; flip --bias to 0.5 to watch it
+# say no. Thresholds below are the four-fifths rule plus error-rate caps.
+version: 1
+audit:
+  data: gate-data/decisions.csv
+  truth: on_time
+  pred: priority_route
+  groups: [group]
+  min_group_n: 30
+  bootstrap: 100
+  bootstrap_seed: 42
+thresholds:
+  disparate_impact_ratio: {min: 0.8}
+  demographic_parity_diff: {max: 0.2}
+  tpr_gap: {max: 0.15}
+  fpr_gap: {max: 0.15}
+gate:
+  fail_mode: block
+  review: block

@@ -1,0 +1,24 @@
+# Example consumer config for the opsaudit disparity gate.
+#
+# The bundled data/decisions.csv was generated deterministically with
+#   opsaudit generate --scenario dispatch --n 2000 --bias 0.5 --seed 42
+# so the gate FAILS on purpose here: copy this directory into your repo,
+# run the workflow, and watch the gate say no. Then regenerate with
+# --bias 0.0 and watch it pass.
+version: 1
+audit:
+  data: examples/gate-consumer/data/decisions.csv
+  truth: on_time
+  pred: priority_route
+  groups: [group]
+  min_group_n: 30
+  bootstrap: 100
+  bootstrap_seed: 42
+thresholds:
+  disparate_impact_ratio: {min: 0.8}
+  demographic_parity_diff: {max: 0.2}
+  tpr_gap: {max: 0.15}
+  fpr_gap: {max: 0.15}
+gate:
+  fail_mode: block # the check fails and the merge is blocked on breach
+  review: block # "human review required" also blocks until a sign-off

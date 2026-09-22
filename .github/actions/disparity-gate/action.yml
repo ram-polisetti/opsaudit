@@ -1,0 +1,169 @@
+name: "opsaudit disparity gate"
+description: >-
+  Run an opsaudit disparity audit on every PR and block the merge when
+  fairness thresholds breach. Posts the verdict as a PR comment with
+  evidence and appends every verdict to an append-only audit log.
+
+# Required permissions in the calling workflow:
+#   contents: write       # append verdicts to the audit-log branch
+#   pull-requests: write  # post the verdict comment
+#   actions: write        # upload the verdict/report artifact
+#
+# Minimal caller:
+#   - uses: ram-polisetti/opsaudit/.github/actions/disparity-gate@main
+#     with:
+#       config: .opsaudit-gate.yml
+
+inputs:
+  config:
+    description: "Path to the .opsaudit-gate.yml config in the consuming repo."
+    required: false
+    default: ".opsaudit-gate.yml"
+  opsaudit-source:
+    description: "Install opsaudit from 'pip' (git ref) or 'local' (the consuming checkout)."
+    required: false
+    default: "pip"
+  opsaudit-ref:
+    description: "Git ref of ram-polisetti/opsaudit to install when opsaudit-source is 'pip'."
+    required: false
+    default: "main"
+  github-token:
+    description: "Token used for PR comments and the audit-log branch push. Defaults to the workflow's github.token."
+    required: false
+    default: ""
+  comment:
+    description: "Post the verdict as a PR comment ('true'/'false')."
+    required: false
+    default: "true"
+  log-to-branch:
+    description: "Append the verdict to the audit-log branch ('true'/'false')."
+    required: false
+    default: "true"
+  audit-log-branch:
+    description: "Dedicated branch holding the append-only verdict log."
+    required: false
+    default: "opsaudit-audit-log"
+  out-dir:
+    description: "Directory for verdict.json, verdict.md, and the report bundle."
+    required: false
+    default: "gate-out"
+
+outputs:
+  verdict:
+    description: "Gate verdict: pass, fail, or review."
+    value: ${{ steps.gate.outputs.verdict }}
+  exit-code:
+    description: "Gate exit code: 0 pass, 1 fail, 2 review."
+    value: ${{ steps.gate.outputs.exit-code }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install opsaudit
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.opsaudit-source }}" = "local" ]; then
+          pip install .
+        else
+          pip install "git+https://github.com/ram-polisetti/opsaudit.git@${{ inputs.opsaudit-ref }}"
+        fi
+        opsaudit --version
+
+    - name: Run the disparity gate
+      id: gate
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+      run: |
+        set -uo pipefail
+        set +e
+        opsaudit gate-run \
+          --config "${{ inputs.config }}" \
+          --sha "${{ github.sha }}" \
+          --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          --out-dir "${{ inputs.out-dir }}"
+        EXIT_CODE=$?
+        set -e
+        VERDICT=$(python -c "import json; print(json.load(open('${{ inputs.out-dir }}/verdict.json'))['status'])")
+        echo "verdict=${VERDICT}" >> "$GITHUB_OUTPUT"
+        echo "exit-code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+        echo "Gate verdict: ${VERDICT} (exit ${EXIT_CODE})"
+        # Do not fail here: the comment, artifact, and log steps must run first.
+        # The final "Enforce the verdict" step fails the job when blocking.
+
+    - name: Upload verdict and report artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: disparity-gate-verdict
+        path: ${{ inputs.out-dir }}
+        retention-days: 90
+
+    - name: Post the verdict as a PR comment
+      if: github.event_name == 'pull_request' && inputs.comment == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+      run: |
+        set -euo pipefail
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --body-file "${{ inputs.out-dir }}/verdict.md" \
+          --repo "${{ github.repository }}"
+
+    - name: Append the verdict to the audit log branch
+      if: inputs.log-to-branch == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token || github.token }}
+      run: |
+        set -euo pipefail
+        BRANCH="${{ inputs.audit-log-branch }}"
+        export OUT_DIR="${{ inputs.out-dir }}"
+        git config user.name "opsaudit-gate[bot]"
+        git config user.email "opsaudit-gate[bot]@users.noreply.github.com"
+        if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+          git fetch origin "$BRANCH"
+          git checkout -B "$BRANCH" "origin/$BRANCH"
+        else
+          git checkout --orphan "$BRANCH"
+          git rm -rf . >/dev/null 2>&1 || true
+          printf '# opsaudit audit log\n\nAppend-only JSONL verdicts, one per gate run.\n' > README.md
+          git add README.md
+          git commit -qm "init audit log branch"
+        fi
+        python -c "
+        import json
+        verdict = json.load(open('$OUT_DIR/verdict.json'))
+        with open('verdicts.jsonl', 'a', encoding='utf-8') as handle:
+            handle.write(json.dumps(verdict) + chr(10))
+        "
+        git add verdicts.jsonl
+        STATUS=$(python -c 'import json,os; print(json.load(open(os.path.join(os.environ["OUT_DIR"], "verdict.json")))["status"])')
+        git commit -qm "gate verdict: ${STATUS} for ${{ github.sha }}"
+        # Push with rebase retries: concurrent gate runs must not clobber each other.
+        for attempt in 1 2 3 4 5; do
+          if git push origin "$BRANCH"; then
+            echo "verdict appended to $BRANCH"
+            break
+          fi
+          echo "push conflict, rebasing (attempt $attempt)"
+          git pull --rebase origin "$BRANCH"
+          sleep "$attempt"
+        done
+
+    - name: Enforce the verdict
+      shell: bash
+      run: |
+        set -euo pipefail
+        EXIT_CODE="${{ steps.gate.outputs.exit-code }}"
+        VERDICT="${{ steps.gate.outputs.verdict }}"
+        if [ "$EXIT_CODE" != "0" ]; then
+          echo "::error::disparity gate verdict: ${VERDICT} — merge blocked (see the PR comment and the verdict artifact)."
+          exit "$EXIT_CODE"
+        fi
+        echo "disparity gate passed."

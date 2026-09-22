@@ -1,0 +1,30 @@
+# Copy this file to .github/workflows/disparity-gate.yml in your repo,
+# and copy .opsaudit-gate.yml to your repo root. Adjust `paths` so the gate
+# runs on PRs that touch your model code, training data, or features.
+name: disparity-gate
+
+on:
+  pull_request:
+    paths:
+      - "models/**"
+      - "src/models/**"
+      - "data/**"
+      - ".opsaudit-gate.yml"
+
+permissions:
+  contents: write # append verdicts to the opsaudit-audit-log branch
+  pull-requests: write # post the verdict comment
+  actions: write # upload the verdict/report artifact
+
+jobs:
+  disparity-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the opsaudit disparity gate
+        uses: ram-polisetti/opsaudit/.github/actions/disparity-gate@main
+        with:
+          config: .opsaudit-gate.yml
+          # opsaudit-ref: main        # pin to a tag/SHA for stability
+          # github-token: ${{ secrets.GITHUB_TOKEN }}  # default; override for fork-PR setups

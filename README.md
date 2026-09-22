@@ -128,6 +128,79 @@ The biased dispatch quickstart intentionally produces a failed report, including
 
 The gate uses exit `0` for `PASS`, `1` for `FAIL`, and `2` for `REVIEW`. A review condition means the tool cannot make a reliable release recommendation without a human decision.
 
+## Disparity-gate GitHub Action
+
+The gate ships as a reusable composite action that turns the thesis — the
+bias check belongs in the deployment pipeline, as a gate that can say no —
+into a merge-blocking check on every PR.
+
+### Adopt it in your repo
+
+1. Add `.opsaudit-gate.yml` to your repo root (see
+   [examples/gate-consumer](examples/gate-consumer/) for a complete,
+   deliberately-failing example):
+   ```yaml
+   version: 1
+   audit:
+     data: data/decisions.csv   # CSV with one row per decision
+     truth: hired               # ground-truth outcome column
+     pred: model_decision       # model decision column (omit for outcome-rate-only audits)
+     groups: [gender]           # one or more group columns
+     min_group_n: 30
+     bootstrap: 200
+   thresholds:                  # overrides; defaults are the four-fifths rule + 0.15 error gaps
+     disparate_impact_ratio: {min: 0.8}
+   gate:
+     fail_mode: block           # block | advisory
+     review: block              # block | pass — how a REVIEW verdict treats the check
+   ```
+2. Add `.github/workflows/disparity-gate.yml` (copy
+   `examples/gate-consumer/workflow.yml`), set the `paths:` filter to your
+   model code, data, and features, and grant the three permissions
+   (`contents: write`, `pull-requests: write`, `actions: write`).
+3. Open a PR. The action installs opsaudit, runs
+   `opsaudit gate-run`, uploads the verdict + full report bundle as an
+   artifact, posts the verdict as a PR comment, and appends the verdict to
+   the append-only audit log.
+
+### What "the gate says no" looks like
+
+A failing check posts a comment with the decision banner
+(`⛔ Disparity gate: THE GATE SAYS NO`), a table of every check with its
+value vs. threshold, the affected slices sorted by selection rate, any
+evidence-quality notes, and a link to the full report artifact. The check
+stays red until the disparity is fixed or the threshold is deliberately
+relaxed in `.opsaudit-gate.yml` with justification.
+
+When the evidence is too thin to judge (tiny groups, missing predictions),
+the gate returns `REVIEW` instead of guessing: the check blocks until a
+human records `opsaudit signoff --report <report.json> --reviewer <name>
+--decision approve|reject`, hash-chained to the report.
+
+### The audit log: design and tradeoff
+
+Every verdict (pass/fail/review, commit SHA, metrics, timestamp) is appended
+as one JSONL line to `verdicts.jsonl` on a dedicated orphan branch,
+`opsaudit-audit-log`, plus a 90-day workflow artifact as backup. The branch
+design was chosen because PR workflows never touch that ref, so the log
+survives force-pushes to feature branches and history rewrites on `main` —
+a log committed to `main` itself would not. Tradeoffs, stated plainly:
+appending needs `contents: write`; concurrent runs rebase-and-retry on push
+conflicts (5 attempts); and a repository admin can still delete the branch,
+so for evidentiary-grade immutability you would mirror `verdicts.jsonl` to
+external immutable storage — that mirroring is out of scope here.
+
+### Limitations
+
+- The gate audits the data you point it at; it cannot detect disparities in
+  data it never sees, and a passing gate is not a fairness certification.
+- Thresholds are policy, not physics: the defaults encode the four-fifths
+  rule and should be set deliberately per deployment.
+- `review: block` is the safe default, but it means thin data blocks merges
+  until a human signs off — plan reviewer capacity accordingly.
+- Fork-PR setups need the `pull_request_target` pattern (the bundled
+  workflow uses `pull_request`); see the example for the permission notes.
+
 ## Project status and roadmap
 
 ### v0.1.0 — available from GitHub
