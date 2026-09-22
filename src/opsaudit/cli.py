@@ -151,6 +151,33 @@ def gate(report: Path, thresholds: Path | None) -> None:
     raise SystemExit({"pass": 0, "fail": 1, "review": 2}[status])
 
 
+@main.command("gate-run")
+@click.option("--config", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option("--sha", default=None, help="Commit SHA recorded in the verdict.")
+@click.option("--run-url", default=None, help="CI run URL linked from the verdict.")
+@click.option("--out-dir", type=click.Path(path_type=Path), required=True)
+def gate_run(config: Path, sha: str | None, run_url: str | None, out_dir: Path) -> None:
+    """Run the full CI disparity gate from a ``.opsaudit-gate.yml`` config.
+
+    Writes ``verdict.json``, ``verdict.md`` (the PR comment body), and the
+    full audit report bundle into ``--out-dir``. Exits 0 for pass, 1 for
+    fail, 2 for human review (unless the config says otherwise).
+    """
+    from .gate_ci import load_gate_config, run_gate, save_gate_report, write_gate_outputs
+
+    gate_config = load_gate_config(config)
+    repo_root = Path.cwd()
+    verdict = run_gate(gate_config, repo_root, sha=sha)
+    write_gate_outputs(verdict, out_dir, run_url)
+    save_gate_report(verdict, gate_config, repo_root, out_dir)
+    status = verdict["status"]
+    click.echo(f"gate verdict: {status} (exit {verdict['exit_code']})")
+    for finding in verdict["findings"]:
+        if finding["status"] in ("fail", "review"):
+            click.echo(f"[{finding['status'].upper()}] {finding['check']}")
+    raise SystemExit(verdict["exit_code"])
+
+
 @main.command()
 @click.option("--report", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
 @click.option("--data", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
