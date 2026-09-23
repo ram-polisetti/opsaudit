@@ -2,6 +2,16 @@
 
 __version__ = "0.1.1"
 
+from .agents import (
+    GENERATORS,
+    AuditCampaign,
+    AuditPlanner,
+    Budget,
+    BudgetTracker,
+    CampaignReport,
+    ProbeSpec,
+    ResponseCache,
+)
 from .context import load_context
 from .data import generate_dispatch, generate_staffing
 from .evidence import EvidenceLog
@@ -72,5 +82,13 @@ __all__ = [
     "generate_counterfactuals",
     "generate_llm_assisted",
     "generate_metamorphic",
+    "AuditCampaign",
+    "AuditPlanner",
+    "Budget",
+    "BudgetTracker",
+    "CampaignReport",
+    "GENERATORS",
+    "ProbeSpec",
+    "ResponseCache",
     "__version__",
 ]
