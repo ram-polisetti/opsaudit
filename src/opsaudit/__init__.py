@@ -1,6 +1,6 @@
 """opsaudit audits disparity signals in operational decision systems."""
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 from .agents import (
     GENERATORS,
@@ -57,6 +57,17 @@ from .probes import (
     generate_metamorphic,
 )
 from .report import save_report
+from .reports import (
+    AGENTIC_RMF_MAPPING,
+    FLAG_THRESHOLD_DEFAULT,
+    AuditReport,
+    build_report,
+    mappings_for_report,
+    rmf_section as agentic_rmf_section,
+    save_agentic_report,
+    to_html as agentic_to_html,
+    to_markdown as agentic_to_markdown,
+)
 from .rmf import RMF_MAPPING
 from .targets import (
     HuggingFaceTarget,
@@ -125,4 +136,13 @@ __all__ = [
     "cohen_kappa",
     "DEFAULT_KAPPA_THRESHOLD",
     "__version__",
+    "AuditReport",
+    "build_report",
+    "save_agentic_report",
+    "agentic_to_markdown",
+    "agentic_to_html",
+    "agentic_rmf_section",
+    "mappings_for_report",
+    "AGENTIC_RMF_MAPPING",
+    "FLAG_THRESHOLD_DEFAULT",
 ]
