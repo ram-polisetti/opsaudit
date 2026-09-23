@@ -23,6 +23,25 @@ from .gate_ci import (
     render_verdict_markdown,
     run_gate,
 )
+from .judges import (
+    Judge,
+    JudgeScore,
+    LLMJudge,
+    RefusalJudge,
+    StereotypeJudge,
+    ToneJudge,
+    aggregate_judge_findings,
+    group_label_rates,
+    label_rate_gaps,
+    ordinal_means,
+    unscored_rate,
+)
+from .calibration import (
+    DEFAULT_KAPPA_THRESHOLD,
+    CalibrationHarness,
+    CalibrationReport,
+    cohen_kappa,
+)
 from .metrics import AuditResult, audit_disparities
 from .probes import (
     BUILTIN_RELATIONS,
@@ -90,5 +109,20 @@ __all__ = [
     "GENERATORS",
     "ProbeSpec",
     "ResponseCache",
+    "Judge",
+    "JudgeScore",
+    "LLMJudge",
+    "StereotypeJudge",
+    "RefusalJudge",
+    "ToneJudge",
+    "aggregate_judge_findings",
+    "group_label_rates",
+    "label_rate_gaps",
+    "ordinal_means",
+    "unscored_rate",
+    "CalibrationHarness",
+    "CalibrationReport",
+    "cohen_kappa",
+    "DEFAULT_KAPPA_THRESHOLD",
     "__version__",
 ]

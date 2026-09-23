@@ -23,3 +23,5 @@ examples/agentic-audit-demo/phase1_evidence.jsonl
 examples/agentic-audit-demo/phase2_evidence.jsonl
 # Phase 3 demo output (regenerated on each run)
 examples/agentic-audit-demo/phase3_evidence.jsonl
+# Phase 4 demo output (regenerated on each run)
+examples/agentic-audit-demo/phase4_evidence.jsonl
