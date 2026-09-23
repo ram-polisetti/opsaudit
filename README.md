@@ -42,6 +42,54 @@ opsaudit gate --report biased_report.json # expect: FAIL, exit code 1
 
 The `generate` command creates only local, synthetic data. `audit` writes matching `.md`, `.html`, and `.json` reports. The gate returns exit code 0 for a passing result and 1 for a failing result, so it can be used directly in CI.
 
+## Agentic auditor (v0.2)
+
+Point opsaudit at any model — a tabular classifier, a chat model, a RAG pipeline — and get an *adaptive* audit: an LLM planner decides what to probe next, deterministic code builds the probes and computes every statistic, and LLM judges score open-ended text outputs only (with measured calibration). Every step lands in an append-only evidence log, and the campaign renders into a Markdown/HTML report mapped onto NIST AI RMF 1.0.
+
+```
+brief ──▶ AuditPlanner ──ProbeSpec──▶ Probe generators ──▶ Target adapter ──▶ target
+   ▲            │  (LLM picks WHAT            │ (deterministic:        │ (tabular / HF /
+   │            │   to probe; short            │  counterfactual,       │  OpenAI-compat /
+   │            │   JSON, never builds          │  adversarial,          │  Ollama / RAG)
+   │            │   probes)                     │  metamorphic)          │
+   │            ▼                               ▼                      ▼
+   │     ResponseCache ◀── observations ── deterministic summaries ──┘
+   │            │        (gaps, error/violation rates; judge LABELS only)
+   │            ▼
+   └──── replan (or stop: budget exhausted / findings flat / planner stops)
+                                  │
+                                  ▼
+                    AuditReport → Markdown / HTML (+ RMF mapping)
+```
+
+```python
+from opsaudit import TabularTarget, AuditPlanner, AuditCampaign, Budget, build_report
+from opsaudit.reports import save_agentic_report
+
+brief = {
+    "target_type": "tabular",
+    "protected_attributes": {"employment_type": ["FT", "temp"]},
+    "risk_areas": ["hiring decisions"],
+    "base_input": {"tenure_months": 12, "employment_type": "FT"},
+}
+planner = AuditPlanner(brief, planner_llm_target, budget=Budget(max_probes=200))
+campaign = AuditCampaign(audited_target=TabularTarget(model), planner=planner,
+                         evidence_path="evidence.jsonl", seed=42)
+result = campaign.run()
+report = build_report(result, target=campaign.audited_target,
+                      budget={"max_probes": 200})
+save_agentic_report(report, "agentic_report")   # .md + .html + .json
+```
+
+**The hard rules** (enforced in code review, not just docs):
+
+- The LLM proposes; the statistics dispose. Judges turn text into *labels*; every rate, gap, and verdict is computed in deterministic code.
+- No judge ships without a measured calibration score: run `CalibrationHarness` against real human labels (accuracy, Cohen's kappa) before trusting one. The campaign *rejects* uncalibrated judges unless you pass an explicit, evidence-logged `allow_uncalibrated=True`.
+- The report verdict (`FINDINGS WARRANT REVIEW` / `NO MATERIAL FINDINGS`) uses a heuristic flagging threshold (default 0.2), printed next to the verdict — it is not a significance test.
+- RMF mappings name the *evidence the audit contributes* toward real NIST AI RMF 1.0 subcategories (e.g. MEASURE 2.11 for bias evaluation, MEASURE 2.1 for documented test sets); each carries its limits — the tool assists a subcategory, it never satisfies one. See [docs/RMF_MAPPINGS.md](docs/RMF_MAPPINGS.md).
+
+**Limitations, honestly:** the campaign only probes what the planner chose within budget; LLM planners/judges have their own biases (calibration measures agreement, it doesn't remove bias); scripted demos are pipeline proofs, not real audits. Try the scripted end-to-end proof: `python examples/agentic-audit-demo/phase5_demo.py` (no credentials, no network).
+
 ## Provenance, verification, and human sign-off
 
 Every `audit` run embeds a tamper-evident `provenance` block in the report JSON: SHA-256 of the input data, row count, opsaudit version and git SHA, the full resolved CLI arguments, the random seed, a UTC timestamp, the Python version, and the gate verdict computed at audit time. `generate` writes a matching provenance sidecar (`<name>.provenance.json`) next to its CSV.
@@ -229,6 +277,18 @@ for a worked UCI Adult example (a privacy-safe synthetic set passes; a
 memorizing, biased one fails on privacy and bias).
 
 ## Project status and roadmap
+
+### v0.2.0 — the agentic LLM auditor
+
+Five phases, each merged with a green CI gate and an independent demo:
+
+1. **Target adapters + evidence log** — one `Target` interface (`.predict()` / `.generate()`) with adapters for HuggingFace, OpenAI-compatible APIs, Ollama Cloud, tabular/sklearn-style models, and RAG pipelines; append-only JSONL evidence transcript.
+2. **Probe generators** — deterministic counterfactual, adversarial, and metamorphic generators (plus an LLM-assisted proposer treated as untrusted: every candidate validated, invalid ones discarded with reasons).
+3. **Agentic planner loop** — plan → probe → observe → replan with budgets, response caching, deterministic stopping rules, and seeded reproducibility.
+4. **Judges + calibration** — stereotype, refusal, and tone judges that emit labels only; a calibration harness measuring judge-vs-human agreement (Cohen's kappa, PASS/FAIL at 0.6); uncalibrated judges are rejected unless explicitly overridden.
+5. **Reports + RMF + release** — deterministic Markdown/HTML reports with methodology, limitations, and reproducibility blocks; evidence-contribution mappings onto real NIST AI RMF 1.0 subcategories ([docs/RMF_MAPPINGS.md](docs/RMF_MAPPINGS.md)).
+
+Acceptance proof: `examples/agentic-audit-demo/phase5_demo.py` audits three target types and adaptively finds a disparity the fixed v0.1 battery missed. All v0.1 tests remain green.
 
 ### v0.1.0 — available from GitHub
 
