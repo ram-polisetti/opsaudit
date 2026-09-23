@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..evidence import EvidenceLog
+from ..judges.aggregate import aggregate_judge_findings
+from ..judges.tone import TONE_ORDER
 from ..probes import (
     BUILTIN_RELATIONS,
     ProbeBatch,
@@ -88,6 +90,14 @@ class AuditCampaign:
             stdlib ``random`` module for any internal randomness).
         cache: Optional shared :class:`ResponseCache`. A fresh campaign
             gets a fresh in-memory cache unless one is supplied.
+        judges: Optional list of :class:`~opsaudit.judges.base.Judge`
+            used to label non-numeric (text) outputs. Off by default.
+            Every judge must carry a passing calibration report
+            (``judge.calibration``, set by
+            :class:`~opsaudit.calibration.CalibrationHarness`) unless
+            ``allow_uncalibrated`` is True.
+        allow_uncalibrated: Explicit operator override permitting
+            uncalibrated (or FAIL-calibrated) judges. Logged as evidence.
     """
 
     def __init__(
@@ -98,6 +108,8 @@ class AuditCampaign:
         evidence_path: Any,
         seed: int | None = None,
         cache: ResponseCache | None = None,
+        judges: list | None = None,
+        allow_uncalibrated: bool = False,
     ) -> None:
         if audited_target is None:
             raise ValueError("audited_target must not be None")
@@ -108,6 +120,22 @@ class AuditCampaign:
         self.evidence_path = str(evidence_path)
         self.seed = seed
         self.cache = cache or ResponseCache()
+        self.judges = list(judges) if judges else []
+        self.allow_uncalibrated = allow_uncalibrated
+        for judge in self.judges:
+            calibration = getattr(judge, "calibration", None)
+            calibrated_ok = bool(
+                calibration is not None
+                and getattr(calibration, "passed", False)
+            )
+            if not calibrated_ok and not allow_uncalibrated:
+                raise ValueError(
+                    f"judge {getattr(judge, 'judge_id', judge)!r} has no "
+                    "passing calibration report: run "
+                    "CalibrationHarness on it first, or pass "
+                    "allow_uncalibrated=True explicitly (the override is "
+                    "logged as evidence)."
+                )
         self._planner_cache = ResponseCache()
         # Give the planner its own cache namespace so planner prompts
         # and target inputs can never collide.
@@ -140,6 +168,21 @@ class AuditCampaign:
             }
         )
         n_events = 1
+
+        if self.judges and self.allow_uncalibrated:
+            # The operator explicitly accepted uncalibrated judges:
+            # record who and that it was explicit, right up front.
+            n_events += 1
+            log.record(
+                {
+                    "kind": "uncalibrated_judge_override",
+                    "judge_ids": [
+                        getattr(j, "judge_id", repr(j))
+                        for j in self.judges
+                    ],
+                    "allow_uncalibrated": True,
+                }
+            )
 
         history: list[str] = []
         findings: list[dict[str, Any]] = []
@@ -395,9 +438,8 @@ class AuditCampaign:
         summary["strength"] = float(summary["strength"])
         return summary
 
-    @staticmethod
     def _summarize_counterfactual(
-        batch: ProbeBatch, outputs: list[Any], summary: dict[str, Any]
+        self, batch: ProbeBatch, outputs: list[Any], summary: dict[str, Any]
     ) -> None:
         # Group numeric outputs by annotated protected-attribute value.
         numeric = [
@@ -407,10 +449,13 @@ class AuditCampaign:
         ]
         details = summary["details"]
         if not numeric:
-            details["note"] = (
-                "non-numeric outputs recorded without scoring; "
-                "judging deferred to Phase 4"
-            )
+            if self.judges:
+                self._summarize_with_judges(batch, outputs, summary)
+            else:
+                details["note"] = (
+                    "non-numeric outputs recorded without scoring "
+                    "(no judges configured)"
+                )
             return
         attrs: dict[str, dict[str, list[float]]] = {}
         for probe, output in numeric:
@@ -430,6 +475,63 @@ class AuditCampaign:
         details["outcome_rates"] = rates
         details["gaps"] = gaps
         summary["strength"] = max(gaps.values(), default=0.0)
+
+    def _summarize_with_judges(
+        self, batch: ProbeBatch, outputs: list[Any], summary: dict[str, Any]
+    ) -> None:
+        """Score non-numeric (text) outputs with the configured judges.
+
+        Judges produce *labels*; everything computed from them here is
+        deterministic arithmetic (:func:`aggregate_judge_findings`). The
+        round strength is the strongest judge-label gap observed.
+        """
+        details = summary["details"]
+        # Only string outputs can be judged; anything else is counted,
+        # not silently dropped.
+        judged_idx = [
+            i for i, o in enumerate(outputs) if isinstance(o, str)
+        ]
+        details["n_judged_outputs"] = len(judged_idx)
+        details["n_non_string_outputs"] = len(outputs) - len(judged_idx)
+        if not judged_idx:
+            details["note"] = "no string outputs for judges to score"
+            return
+        texts = [outputs[i] for i in judged_idx]
+        judged_probes = [batch.probes[i] for i in judged_idx]
+        # Group by each protected attribute the probes annotate.
+        attr_names = sorted(
+            {attr for p in judged_probes for attr in p.attributes}
+        )
+        judge_findings: list[dict[str, Any]] = []
+        for judge in self.judges:
+            scores = judge.score(texts)
+            ordinal = (
+                TONE_ORDER if getattr(judge, "name", "") == "tone-judge" else None
+            )
+            per_attr: dict[str, Any] = {}
+            best = 0.0
+            for attr in attr_names:
+                groups = [str(p.attributes.get(attr)) for p in judged_probes]
+                agg = aggregate_judge_findings(
+                    judge.judge_id, scores, groups, ordinal=ordinal
+                )
+                per_attr[attr] = agg
+                best = max(best, float(agg["strength"]))
+            judge_findings.append(
+                {
+                    "judge_id": judge.judge_id,
+                    "model_id": getattr(judge, "model_id", "unknown-model"),
+                    "calibrated": bool(
+                        getattr(getattr(judge, "calibration", None), "passed", False)
+                    ),
+                    "by_attribute": per_attr,
+                    "best_strength": round(best, 4),
+                }
+            )
+        details["judge_findings"] = judge_findings
+        summary["strength"] = max(
+            (jf["best_strength"] for jf in judge_findings), default=0.0
+        )
 
     @staticmethod
     def _summarize_adversarial(
