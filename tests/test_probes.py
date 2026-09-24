@@ -132,7 +132,7 @@ def test_counterfactual_multiple_attributes_varied_one_at_a_time():
     )
     ok, problems = check_symmetry(batch)
     assert ok, problems
-    for pair_id, members in batch.pair_groups().items():
+    for members in batch.pair_groups().values():
         attr = members[0].meta["attribute"]
         for probe in members:
             for key in ("age", "group", "region"):
@@ -259,7 +259,7 @@ def test_check_symmetry_catches_text_drift():
     broken = ProbeBatch(
         [corrupted if p.id == bad.id else p for p in batch.probes]
     )
-    ok, problems = check_symmetry(broken)
+    ok, _problems = check_symmetry(broken)
     assert not ok
 
 
@@ -334,9 +334,7 @@ def test_metamorphic_pairs_and_evaluate_pass():
     # identity target: outputs equal -> all equal_output verdicts pass
     outputs = {}
     for probe in batch:
-        outputs[probe.id] = (
-            "APPROVE" if probe.meta["role"] == "source" else "APPROVE"
-        )
+        outputs[probe.id] = "APPROVE"
     verdicts = evaluate_metamorphic(batch, outputs)
     assert verdicts
     assert all(v["passed"] for v in verdicts)
@@ -474,7 +472,7 @@ def test_llm_assisted_retries_empty_response_once():
         [_cand("adversarial", {"x": 1}, {}, "must not crash")]
     )
     target = _FakeTextTarget(["", good])
-    batch, report = generate_llm_assisted(target, brief="x")
+    _batch, report = generate_llm_assisted(target, brief="x")
     assert target.calls == 2
     assert report["kept"] == 1
 

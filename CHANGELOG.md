@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- `ruff check` is clean (was 66 findings): implicit string concatenations
+  parenthesized, blind `except Exception` catches documented with `noqa`
+  (each is an intentional never-crash boundary), subprocess calls carry
+  explicit `check=`, NaN comparisons use `math.isnan`, plus mechanical
+  SIM/PERF/RUF/PIE/B017 fixes. `TRY004` is disabled project-wide by
+  convention: `ValueError` is the single validation-error type, pinned by
+  60+ tests.
+- `CalibrationHarness.run` now raises `ValueError` when a judge returns a
+  different number of scores than input texts, instead of silently
+  truncating via `zip` and corrupting agreement metrics.
+
+### Added
+
+- Third real dataset audit: UCI Statlog German Credit (1,000 rows,
+  registry-pinned SHA-256 verified), real `DecisionTreeClassifier`
+  (max_depth=8, train acc 0.890), groups sex × age_bin → gate FAIL on FPR
+  gap 0.236 (exit 1) while DI/DP/TPR pass; `opsaudit verify` confirms
+  provenance, deterministic re-run, and gate status. Evidence under the
+  goal's `hidden_files/third-dataset-evidence/`.
+- Calibration edge-case tests: short/long score lists rejected, empty
+  dataset fails closed.
+
 ## 0.2.1 — 2026-09-24
 
 Patch release driven by the first real end-to-end audits on real data

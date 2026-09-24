@@ -44,6 +44,14 @@ llm = ["httpx>=0.27"]
 [project.scripts]
 opsaudit = "opsaudit.cli:main"
 
+[tool.ruff.lint]
+# TRY004 (prefer TypeError over ValueError for type errors) is intentionally
+# off: this codebase raises ValueError for ALL argument-validation failures
+# (wrong type or bad value) and 60+ tests pin that contract. Splitting the
+# two exception types would churn the public error surface for no audit
+# benefit.
+ignore = ["TRY004"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

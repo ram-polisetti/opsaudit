@@ -134,7 +134,7 @@ class LLMJudge(Judge):
                 model_id = str(
                     info.get("model", info.get("name", "unknown-model"))
                 )
-            except Exception:  # never let introspection break judging
+            except Exception:  # never let introspection break judging  # noqa: BLE001
                 model_id = "unknown-model"
         self.model_id = model_id
 
@@ -159,7 +159,7 @@ class LLMJudge(Judge):
         prompts = [self._prompt_for(t) for t in texts]
         try:
             raws = list(self.judge_target.generate(prompts))
-        except Exception as exc:  # transport failure -> all unscored
+        except Exception as exc:  # transport failure -> all unscored  # noqa: BLE001
             return [
                 self._unscored(f"judge model call failed: {exc}")
                 for _ in texts
@@ -172,7 +172,7 @@ class LLMJudge(Judge):
             retry_prompts = [prompts[i] for i in empties]
             try:
                 retry_raws = list(self.judge_target.generate(retry_prompts))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 retry_raws = []  # retry failed; empties stay unscored
             retry_raws = (list(retry_raws) + [""] * len(empties))[: len(empties)]
             for i, r in zip(empties, retry_raws):

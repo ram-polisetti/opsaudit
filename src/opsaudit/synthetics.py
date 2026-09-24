@@ -346,17 +346,19 @@ def audit_fidelity(
         verdict = "review"
     else:
         verdict = "fail"
-    if any(
-        f["code"] == "vanished_categories"
-        and f["max_source_support"] >= _VANISHED_MIN_SUPPORT
-        for f in findings
+    # Losing a whole well-represented category is a utility failure
+    # even when the aggregate score looks fine: a downstream model
+    # never sees it. (Singleton losses are sampling noise and do not
+    # escalate.)
+    if (
+        any(
+            f["code"] == "vanished_categories"
+            and f["max_source_support"] >= _VANISHED_MIN_SUPPORT
+            for f in findings
+        )
+        and _VERDICT_ORDER[verdict] < _VERDICT_ORDER["review"]
     ):
-        # Losing a whole well-represented category is a utility failure
-        # even when the aggregate score looks fine: a downstream model
-        # never sees it. (Singleton losses are sampling noise and do not
-        # escalate.)
-        if _VERDICT_ORDER[verdict] < _VERDICT_ORDER["review"]:
-            verdict = "review"
+        verdict = "review"
 
     return {
         "verdict": verdict,
@@ -830,25 +832,27 @@ def audit_bias_amplification(
                 "in the synthetic data",
             }
         )
-    if verdict == "pass":
-        if (
+    if verdict == "pass" and (
+        (
             amplification_factor is not None
             and amplification_factor > active["review_amplification"]
             and separated("disparate_impact_ratio", worse_higher=False)
-        ) or (
+        )
+        or (
             max_gap_growth > active["review_gap_growth"]
             and separated(worst_gap_metric, worse_higher=True)
-        ):
-            verdict = "review"
-            findings.append(
-                {
-                    "code": "bias_drift",
-                    "amplification_factor": amplification_factor,
-                    "max_gap_growth": max_gap_growth,
-                    "message": "disparity drifted upward in the synthetic data; "
-                    "human review advised",
-                }
-            )
+        )
+    ):
+        verdict = "review"
+        findings.append(
+            {
+                "code": "bias_drift",
+                "amplification_factor": amplification_factor,
+                "max_gap_growth": max_gap_growth,
+                "message": "disparity drifted upward in the synthetic data; "
+                "human review advised",
+            }
+        )
     if verdict == "pass" and amplification_factor is not None and amplification_factor < 0.9:
         findings.append(
             {

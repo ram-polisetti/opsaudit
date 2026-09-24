@@ -16,10 +16,11 @@ score the softer relations).
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from .base import Probe, ProbeBatch
@@ -67,7 +68,7 @@ def _date_format(payload: Any) -> Any:
             try:
                 # Platform-safe long date ("Jan 5, 2026"); %-d is
                 # POSIX-only, so build it manually.
-                name = datetime(year, month, 1).strftime("%b")
+                name = datetime(year, month, 1, tzinfo=timezone.utc).strftime("%b")
                 return f"{name} {day}, {year}"
             except ValueError:
                 return match.group(0)  # not a real date; leave alone
@@ -249,13 +250,21 @@ def generate_metamorphic(
     return ProbeBatch(probes=probes, name=f"{id_prefix}-metamorphic")
 
 
+def _is_nan_like(x: Any) -> bool:
+    """True for float NaN (incl. numpy floating NaN); never raises."""
+    try:
+        return math.isnan(x)
+    except (TypeError, ValueError):
+        return False
+
+
 def check_equal_output(a: Any, b: Any) -> bool:
     """Strict equality for ``equal_output`` relations (NaN-safe)."""
     try:
-        if a != a and b != b:  # both NaN
+        if _is_nan_like(a) and _is_nan_like(b):  # both NaN
             return True
         return bool(a == b)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 

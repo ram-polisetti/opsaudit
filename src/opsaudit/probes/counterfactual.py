@@ -38,7 +38,7 @@ def _distinct(values: list[Any]) -> list[Any]:
 def _safe_equal(a: Any, b: Any) -> bool:
     try:
         return bool(a == b)
-    except Exception:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover - defensive  # noqa: BLE001
         return False
 
 

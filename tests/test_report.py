@@ -22,7 +22,7 @@ def test_markdown_contains_groups_and_disparate_impact_ratio():
 def test_html_has_document_start_and_group_labels():
     html = to_html(_result())
 
-    assert html.startswith("<!DOCTYPE html>") or html.startswith("<html")
+    assert html.startswith(("<!DOCTYPE html>", "<html"))
     assert "A" in html
     assert "B" in html
     assert "C" in html

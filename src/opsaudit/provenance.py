@@ -105,12 +105,14 @@ def _git_status(repo: Path) -> dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,  # returncode handled explicitly below
         )
         dirty = subprocess.run(
             ["git", "-C", str(repo), "status", "--porcelain"],
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,  # returncode handled explicitly below
         )
         if sha.returncode != 0:
             return {"git_sha": None, "git_dirty": None}
@@ -213,8 +215,8 @@ def check_body_hash(document: dict[str, Any]) -> tuple[bool, str]:
     if actual != expected:
         return (
             False,
-            "report body hash mismatch: metrics or provenance were modified "
-            f"after the audit (expected {expected[:12]}…, got {actual[:12]}…)",
+            ("report body hash mismatch: metrics or provenance were modified "
+            f"after the audit (expected {expected[:12]}…, got {actual[:12]}…)"),
         )
     return True, ""
 
@@ -263,14 +265,14 @@ def check_signoff_chain(document: dict[str, Any]) -> tuple[bool, str]:
         if record["record_hash"] != canonical_hash(content):
             return (
                 False,
-                f"sign-off #{index + 1} was modified after signing "
-                "(record hash mismatch)",
+                (f"sign-off #{index + 1} was modified after signing "
+                "(record hash mismatch)"),
             )
         if record["prev_hash"] != expected_prev:
             return (
                 False,
-                f"sign-off #{index + 1} chain broken: a previous record or the "
-                "report body was modified after signing",
+                (f"sign-off #{index + 1} chain broken: a previous record or the "
+                "report body was modified after signing"),
             )
         expected_prev = canonical_hash(record)
     return True, ""

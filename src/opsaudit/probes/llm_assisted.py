@@ -124,9 +124,9 @@ def _pair_counterfactuals(
             unpaired.append(
                 (
                     candidates[i],
-                    "text-payload counterfactual: symmetry needs "
+                    ("text-payload counterfactual: symmetry needs "
                     "template metadata — use generate_counterfactuals "
-                    "instead",
+                    "instead"),
                 )
             )
             used.add(i)
@@ -171,8 +171,8 @@ def _pair_counterfactuals(
             unpaired.append(
                 (
                     candidates[i],
-                    "no symmetric mirror found differing in exactly "
-                    "one protected attribute",
+                    ("no symmetric mirror found differing in exactly "
+                    "one protected attribute"),
                 )
             )
         else:
@@ -272,7 +272,6 @@ def generate_llm_assisted(
         valid.append(candidate)
 
     kept: list[Probe] = []
-    seq = 0
 
     def mint(
         candidate: dict,
@@ -326,7 +325,7 @@ def generate_llm_assisted(
     for cand, reason in unpaired:
         discard(f"counterfactual: {reason}")
 
-    for cand in other:
+    for seq, cand in enumerate(other):
         kept.append(
             mint(
                 cand,
@@ -335,7 +334,6 @@ def generate_llm_assisted(
                 probe_id=f"llm-{seq}",
             )
         )
-        seq += 1
 
     report["kept"] = len(kept)
     return ProbeBatch(probes=kept, name="llm-assisted"), report

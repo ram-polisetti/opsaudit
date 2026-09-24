@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -316,7 +317,7 @@ def test_save_agentic_report_writes_three_files(tmp_path):
 
 def test_report_is_frozen():
     report = _report()
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         report.verdict = "x"  # type: ignore[misc]
 
 

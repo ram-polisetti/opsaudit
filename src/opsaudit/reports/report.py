@@ -45,16 +45,16 @@ _APPROACH = (
 )
 
 _LIMITATIONS = (
-    "Findings are limited to what the campaign probed within its "
-    "budget (see Budget); absence of a finding is not proof of absence.",
-    "The verdict is a heuristic flagging rule, not a statistical "
-    "significance test.",
-    "LLM judges label unstructured text only; their labels are only "
+    ("Findings are limited to what the campaign probed within its "
+    "budget (see Budget); absence of a finding is not proof of absence."),
+    ("The verdict is a heuristic flagging rule, not a statistical "
+    "significance test."),
+    ("LLM judges label unstructured text only; their labels are only "
     "as reliable as their measured calibration (see judge cards) and "
-    "never touch numbers.",
-    "Counterfactual symmetry guarantees come from the deterministic "
+    "never touch numbers."),
+    ("Counterfactual symmetry guarantees come from the deterministic "
     "probe generators; any LLM-proposed probes were validated "
-    "before use.",
+    "before use."),
 )
 
 
@@ -82,10 +82,11 @@ def _git_commit() -> str | None:
             capture_output=True,
             text=True,
             timeout=10,
+            check=True,  # non-zero exit -> CalledProcessError -> None
         )
         sha = out.stdout.strip()
         return sha or None
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -96,7 +97,7 @@ def _describe_target(target: Any) -> dict[str, Any]:
     if callable(describe):
         try:
             info = describe() or {}
-        except Exception:
+        except Exception:  # noqa: BLE001
             info = {}
         return _json_safe(info) if isinstance(info, dict) else {}
     return {}

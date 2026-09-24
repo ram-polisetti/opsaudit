@@ -122,6 +122,13 @@ class CalibrationHarness:
         texts = [text for text, _ in dataset]
         human = [label for _, label in dataset]
         scores = self.judge.score(texts)
+        if len(scores) != len(texts):
+            # Fail loudly: silently zipping a short score list would
+            # drop items and corrupt the agreement metrics.
+            raise ValueError(
+                f"judge returned {len(scores)} scores for {len(texts)} "
+                "texts; score() must return one JudgeScore per text"
+            )
 
         paired: list[tuple[str, str]] = []  # (human, judge) for scored items
         n_unscored = 0

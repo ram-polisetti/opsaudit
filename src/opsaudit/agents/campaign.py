@@ -361,7 +361,7 @@ class AuditCampaign:
         if missing:
             try:
                 fresh = list(self.audited_target.generate(missing))
-            except Exception as exc:  # target must not kill the campaign
+            except Exception as exc:  # target must not kill the campaign  # noqa: BLE001
                 fresh = [{_ERROR_KEY: f"{type(exc).__name__}: {exc}"}] * len(
                     missing
                 )
@@ -397,7 +397,7 @@ class AuditCampaign:
                     pd.DataFrame(missing_rows)
                 )
                 fresh = list(fresh)
-            except Exception as exc:  # target must not kill the campaign
+            except Exception as exc:  # target must not kill the campaign  # noqa: BLE001
                 fresh = [{_ERROR_KEY: f"{type(exc).__name__}: {exc}"}] * len(
                     missing_rows
                 )

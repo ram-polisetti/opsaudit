@@ -140,7 +140,7 @@ class AuditPlanner:
         # Concrete example built from the brief's REAL attribute names --
         # a literal placeholder here gets copied verbatim by real LLMs.
         if isinstance(attrs, dict) and attrs:
-            ex_attr = sorted(attrs)[0]
+            ex_attr = min(attrs)
             ex_vals = list(attrs[ex_attr])[:2]
             cf_example = json.dumps({"attributes": {ex_attr: ex_vals}})
         else:

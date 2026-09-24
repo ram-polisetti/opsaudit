@@ -192,6 +192,40 @@ def test_harness_all_unscored_is_fail():
     assert report.accuracy == 0.0
 
 
+class ShortJudge(FixedJudge):
+    """Returns fewer scores than texts (contract violation)."""
+
+    def score(self, texts):
+        return super().score(texts)[:1]
+
+
+class LongJudge(FixedJudge):
+    """Returns more scores than texts (contract violation)."""
+
+    def score(self, texts):
+        return super().score(texts) + super().score(texts)[:1]
+
+
+def test_harness_rejects_short_score_list():
+    dataset = [("t1", "a"), ("t2", "b")]
+    with pytest.raises(ValueError, match="2 texts"):
+        CalibrationHarness(ShortJudge(["a", "b"])).run(dataset)
+
+
+def test_harness_rejects_long_score_list():
+    dataset = [("t1", "a"), ("t2", "b")]
+    with pytest.raises(ValueError, match="2 texts"):
+        CalibrationHarness(LongJudge(["a", "b"])).run(dataset)
+
+
+def test_harness_empty_dataset_is_fail():
+    report = CalibrationHarness(FixedJudge([])).run([])
+    assert not report.passed
+    assert report.n_items == 0
+    assert report.n_scored == 0
+    assert "scored nothing" in report.notes[0]
+
+
 def test_harness_rejects_bad_threshold():
     with pytest.raises(ValueError):
         CalibrationHarness(FixedJudge(["a"]), kappa_threshold=1.5)

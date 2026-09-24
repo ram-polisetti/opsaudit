@@ -52,18 +52,18 @@ def to_html(report: object) -> str:
         "</head>",
         "<body>",
         "<h1>Agentic audit report (opsaudit)</h1>",
-        f"<p class=\"muted\">Generated: {_e(getattr(report, 'generated', ''))} | "
+        (f"<p class=\"muted\">Generated: {_e(getattr(report, 'generated', ''))} | "
         f"opsaudit {_e(getattr(report, 'package_version', ''))} | "
         f"target: {_e(getattr(report, 'target_name', ''))} "
-        f"({_e(getattr(report, 'target_type', ''))})</p>",
-        f"<p>Verdict: <span class=\"{verdict_class}\">{_e(verdict)}</span> "
+        f"({_e(getattr(report, 'target_type', ''))})</p>"),
+        (f"<p>Verdict: <span class=\"{verdict_class}\">{_e(verdict)}</span> "
         f"(flagging threshold {_fmt(getattr(report, 'flag_threshold', None))}, "
-        "heuristic — not a significance test)</p>",
+        "heuristic — not a significance test)</p>"),
         "<h2>Executive summary</h2>",
         f"<p>{_e(getattr(report, 'executive_summary', ''))}</p>",
         "<h2>Findings</h2>",
-        "<table><thead><tr><th>round</th><th>generator</th><th>probes</th>"
-        "<th>strength</th><th>key signal</th></tr></thead><tbody>",
+        ("<table><thead><tr><th>round</th><th>generator</th><th>probes</th>"
+        "<th>strength</th><th>key signal</th></tr></thead><tbody>"),
     ]
     for finding in getattr(report, "findings", ()):
         parts.append(

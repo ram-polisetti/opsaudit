@@ -187,12 +187,12 @@ def test_minimal_config_is_valid(tmp_path):
         "version: 1\naudit: {data: decisions.csv, truth: on_time}",
         "version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group], bootstrap: -1}",
         "version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group], min_group_n: 0}",
-        "version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group]}\n"
-        "thresholds: {bogus_check: {max: 0.2}}",
-        "version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group]}\n"
-        "thresholds: {tpr_gap: {max: 'low'}}",
-        "version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group]}\n"
-        "gate: {fail_mode: explode}",
+        ("version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group]}\n"
+        "thresholds: {bogus_check: {max: 0.2}}"),
+        ("version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group]}\n"
+        "thresholds: {tpr_gap: {max: 'low'}}"),
+        ("version: 1\naudit: {data: decisions.csv, truth: on_time, groups: [group]}\n"
+        "gate: {fail_mode: explode}"),
         "version: 1\ngate: {fail_mode: block}",
         "- just\n- a\n- list",
     ],

@@ -26,10 +26,10 @@ def to_markdown(report: object) -> str:
     lines = [
         "# Agentic audit report (opsaudit)",
         "",
-        f"Generated: {_cell(getattr(report, 'generated', ''))} | "
+        (f"Generated: {_cell(getattr(report, 'generated', ''))} | "
         f"opsaudit {getattr(report, 'package_version', '')} | "
         f"target: {_cell(getattr(report, 'target_name', ''))} "
-        f"({_cell(getattr(report, 'target_type', ''))})",
+        f"({_cell(getattr(report, 'target_type', ''))})"),
         "",
         "## Executive summary",
         "",
