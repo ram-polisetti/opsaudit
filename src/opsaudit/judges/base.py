@@ -150,19 +150,39 @@ class LLMJudge(Judge):
     # -- shared execution ----------------------------------------------
     def score(self, texts: list[str]) -> list[JudgeScore]:
         """Score each text via the judging model (one short request per
-        text, one retry on empty, ``unscored`` on persistent failure)."""
+        text, one retry on empty, ``unscored`` on persistent failure).
+
+        A transport-level failure from the judging model (network error,
+        timeout, auth failure) never crashes the caller: every affected
+        text is marked ``unscored`` with the failure as the rationale.
+        """
         prompts = [self._prompt_for(t) for t in texts]
-        raws = list(self.judge_target.generate(prompts))
+        try:
+            raws = list(self.judge_target.generate(prompts))
+        except Exception as exc:  # transport failure -> all unscored
+            return [
+                self._unscored(f"judge model call failed: {exc}")
+                for _ in texts
+            ]
         if len(raws) != len(texts):
             raws = (list(raws) + [""] * len(texts))[: len(texts)]
         # Retry once on empty responses (Ollama Cloud quirk).
         empties = [i for i, r in enumerate(raws) if not r.strip()]
         if empties:
             retry_prompts = [prompts[i] for i in empties]
-            retry_raws = list(self.judge_target.generate(retry_prompts))
+            try:
+                retry_raws = list(self.judge_target.generate(retry_prompts))
+            except Exception:
+                retry_raws = []  # retry failed; empties stay unscored
             retry_raws = (list(retry_raws) + [""] * len(empties))[: len(empties)]
             for i, r in zip(empties, retry_raws):
                 raws[i] = r
+        return self._score_raws(texts, raws)
+
+    def _score_raws(
+        self, texts: list[str], raws: list[str]
+    ) -> list[JudgeScore]:
+        """Parse raw model responses into scores (failures -> unscored)."""
         scores: list[JudgeScore] = []
         for text, raw in zip(texts, raws):
             if not raw.strip():

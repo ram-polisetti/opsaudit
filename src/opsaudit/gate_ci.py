@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -28,11 +27,10 @@ import yaml
 from . import __version__
 from .cli import _group_labels, _outcome_rate_result, _require_columns
 from .context import load_context
-from .gate import DEFAULT_THRESHOLDS, _merge_thresholds, evaluate_gate_status
+from .gate import _merge_thresholds, evaluate_gate_status
 from .metrics import audit_disparities
 from .provenance import build_provenance, sha256_file, utc_now
 from .report import save_report
-
 
 CONFIG_SCHEMA_VERSION = 1
 VERDICT_SCHEMA = "opsaudit-gate-verdict/1"

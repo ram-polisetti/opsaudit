@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 
-import pandas as pd
 import pytest
 
 from opsaudit import EvidenceLog
@@ -23,7 +22,7 @@ from opsaudit.agents import (
     ResponseCache,
 )
 from opsaudit.agents.campaign import _cap_batch
-from opsaudit.probes import ProbeBatch, generate_counterfactuals
+from opsaudit.probes import generate_counterfactuals
 from opsaudit.targets import TabularTarget, Target
 
 

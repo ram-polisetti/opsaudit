@@ -30,7 +30,6 @@ from opsaudit.probes import (
 )
 from opsaudit.targets import TabularTarget, Target
 
-
 # ----------------------------------------------------------------------
 # Probe / ProbeBatch basics
 # ----------------------------------------------------------------------

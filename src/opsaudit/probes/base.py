@@ -9,8 +9,9 @@ converts them into whatever shape a target adapter needs.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Iterator
+from typing import Any
 
 #: Probe kinds produced by the deterministic generators (Phase 2).
 #: ``llm_assisted`` marks probes proposed by an LLM and then validated
@@ -74,7 +75,7 @@ class ProbeBatch:
     def __iter__(self) -> Iterator[Probe]:
         return iter(self.probes)
 
-    def __add__(self, other: "ProbeBatch") -> "ProbeBatch":
+    def __add__(self, other: ProbeBatch) -> ProbeBatch:
         if not isinstance(other, ProbeBatch):
             return NotImplemented
         name = self.name or other.name
@@ -92,7 +93,7 @@ class ProbeBatch:
         kind: str | None = None,
         attribute: str | None = None,
         value: Any = None,
-    ) -> "ProbeBatch":
+    ) -> ProbeBatch:
         """Return the subset matching all given criteria."""
         selected = self.probes
         if kind is not None:

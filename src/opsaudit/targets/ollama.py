@@ -36,7 +36,7 @@ _DYNAMIC_CRED_PATH = "/opt/hatch/skills/skill-creator/bin"
 def _surrogate_helpers():
     """Import authd surrogate helpers lazily (only needed for Cloud)."""
     sys.path.insert(0, _DYNAMIC_CRED_PATH)
-    from dynamic_credentials import (  # noqa: E402
+    from dynamic_credentials import (
         add_surrogate_to_request,
         read_json_response,
     )

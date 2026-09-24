@@ -1,5 +1,5 @@
-import yaml
 import pytest
+import yaml
 
 from opsaudit.data import generate_dispatch
 from opsaudit.gate import evaluate_gate, evaluate_gate_status

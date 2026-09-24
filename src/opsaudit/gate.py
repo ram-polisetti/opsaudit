@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 from .metrics import AuditResult
 
-
 GateStatus = Literal["pass", "fail", "review"]
 
 DEFAULT_THRESHOLDS = {

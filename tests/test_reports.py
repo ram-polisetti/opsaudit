@@ -7,21 +7,18 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 
 import pytest
 
 from opsaudit import (
     AGENTIC_RMF_MAPPING,
     FLAG_THRESHOLD_DEFAULT,
-    AuditReport,
     build_report,
     mappings_for_report,
     save_agentic_report,
 )
 from opsaudit.agents import CampaignReport
 from opsaudit.reports import to_html, to_markdown
-
 
 # ----------------------------------------------------------------------
 # Fixtures

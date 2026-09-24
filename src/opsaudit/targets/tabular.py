@@ -39,7 +39,7 @@ class TabularTarget(Target):
 
     def __init__(self, estimator: Any, *, name: str = "tabular") -> None:
         if not hasattr(estimator, "predict") or not callable(
-            getattr(estimator, "predict")
+            estimator.predict
         ):
             raise ValueError(
                 "estimator must expose a callable predict(X) method "

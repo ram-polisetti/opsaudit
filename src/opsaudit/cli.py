@@ -164,7 +164,12 @@ def gate_run(config: Path, sha: str | None, run_url: str | None, out_dir: Path) 
     full audit report bundle into ``--out-dir``. Exits 0 for pass, 1 for
     fail, 2 for human review (unless the config says otherwise).
     """
-    from .gate_ci import load_gate_config, run_gate, save_gate_report, write_gate_outputs
+    from .gate_ci import (
+        load_gate_config,
+        run_gate,
+        save_gate_report,
+        write_gate_outputs,
+    )
 
     gate_config = load_gate_config(config)
     repo_root = Path.cwd()

@@ -19,12 +19,12 @@ from .metamorphic import (
 )
 
 __all__ = [
+    "BUILTIN_RELATIONS",
     "KINDS",
     "STRATEGIES",
-    "BUILTIN_RELATIONS",
+    "MetamorphicRelation",
     "Probe",
     "ProbeBatch",
-    "MetamorphicRelation",
     "check_equal_output",
     "check_symmetry",
     "evaluate_metamorphic",

@@ -19,11 +19,11 @@ from .rag import RagTarget
 from .tabular import TabularTarget
 
 __all__ = [
-    "Target",
     "HuggingFaceTarget",
     "OllamaTarget",
-    "SecureOllamaTarget",
     "OpenAICompatTarget",
     "RagTarget",
+    "SecureOllamaTarget",
     "TabularTarget",
+    "Target",
 ]

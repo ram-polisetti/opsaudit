@@ -17,7 +17,7 @@ from __future__ import annotations
 import datetime
 import json
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any

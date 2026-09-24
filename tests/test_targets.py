@@ -7,7 +7,6 @@ real.
 """
 
 import json
-import os
 import sys
 import types
 
@@ -385,3 +384,94 @@ class TestOllamaTarget:
     def test_describe_needs_no_network(self, monkeypatch):
         monkeypatch.setenv("OLLAMA_MODEL", "m")
         json.dumps(OllamaTarget().describe())
+
+
+class TestSecureOllamaTarget:
+    """SecureOllamaTarget: Ollama Cloud via the stored custom.ollama
+    connector (authd surrogates). No raw key anywhere."""
+
+    def _install_fake_surrogates(self, monkeypatch, seen):
+        import opsaudit.targets.ollama as ollama_mod
+
+        def fake_add_surrogate(req, cred, entry_name=None, allowed_hosts=None):
+            seen["cred"] = cred
+            seen["hosts"] = allowed_hosts
+            # Surrogate marker only — never a raw key.
+            req.add_header("X-Hatch-Surrogate", "hsurr:fake")
+
+        def fake_read_json(resp):
+            return {"message": {"content": "secure-ok"}}
+
+        monkeypatch.setattr(
+            ollama_mod, "_surrogate_helpers",
+            lambda: (fake_add_surrogate, fake_read_json),
+        )
+
+        class FakeResp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def fake_urlopen(req, timeout=None):
+            seen["url"] = req.full_url
+            seen["auth_header"] = req.get_header("Authorization")
+            seen["surrogate_header"] = req.get_header("X-hatch-surrogate")
+            return FakeResp()
+
+        monkeypatch.setattr(
+            "urllib.request.urlopen", fake_urlopen
+        )
+
+    def test_generate_uses_surrogate_not_key(self, monkeypatch):
+        from opsaudit.targets.ollama import SecureOllamaTarget
+
+        seen = {}
+        self._install_fake_surrogates(monkeypatch, seen)
+        # No OLLAMA_API_KEY in the environment at all.
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+        out = SecureOllamaTarget(model="glm-5.1").generate(["hello"])
+        assert out == ["secure-ok"]
+        assert seen["cred"] == "custom.ollama"
+        assert seen["hosts"] == ["ollama.com"]
+        assert seen["url"] == "https://ollama.com/api/chat"
+        assert seen["auth_header"] is None  # no Bearer key header
+        assert seen["surrogate_header"] == "hsurr:fake"
+
+    def test_needs_no_api_key_env(self, monkeypatch):
+        from opsaudit.targets.ollama import SecureOllamaTarget
+
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+        t = SecureOllamaTarget(model="glm-5.1")
+        assert t.api_key == ""
+        assert t.base_url == "https://ollama.com"
+
+    def test_describe_leaks_no_credential(self, monkeypatch):
+        from opsaudit.targets.ollama import SecureOllamaTarget
+
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+        d = SecureOllamaTarget(model="glm-5.1").describe()
+        blob = json.dumps(d)
+        assert "api_key" not in blob.lower().replace("api key", "")
+        assert "hsurr" not in blob
+        assert "Bearer" not in blob
+        assert d["target_type"] == "ollama-secure"
+
+    def test_missing_surrogate_helper_raises_clearly(self, monkeypatch):
+        import opsaudit.targets.ollama as ollama_mod
+        from opsaudit.targets.ollama import SecureOllamaTarget
+
+        def boom():
+            raise ImportError("no surrogate helpers here")
+
+        monkeypatch.setattr(ollama_mod, "_surrogate_helpers", boom)
+        with pytest.raises(ImportError):
+            SecureOllamaTarget(model="glm-5.1").generate(["hi"])
+
+    def test_model_required(self, monkeypatch):
+        from opsaudit.targets.ollama import SecureOllamaTarget
+
+        monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+        with pytest.raises(ValueError, match="model"):
+            SecureOllamaTarget()

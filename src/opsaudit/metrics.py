@@ -98,7 +98,7 @@ class AuditResult:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "AuditResult":
+    def from_dict(cls, d: dict[str, Any]) -> AuditResult:
         """Recreate an audit result saved by :meth:`to_dict`.
 
         Reports generated before the evidence-quality fields were introduced
@@ -189,7 +189,7 @@ def audit_disparities(
     )
     result = AuditResult(
         groups=group_metrics,
-        n_total=int(len(true_values)),
+        n_total=len(true_values),
         demographic_parity_diff=demographic_parity_diff,
         disparate_impact_ratio=disparate_impact_ratio,
         tpr_gap=tpr_gap,

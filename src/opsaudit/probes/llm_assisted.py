@@ -30,7 +30,7 @@ import json
 import re
 from typing import Any
 
-from .base import KINDS, Probe, ProbeBatch
+from .base import Probe, ProbeBatch
 from .counterfactual import _distinct, _safe_equal
 
 #: Kinds the LLM is allowed to propose. ``llm_assisted`` itself is not

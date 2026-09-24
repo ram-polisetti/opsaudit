@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from .metrics import AuditResult
 
-
 RMF_MAPPING = {
     "demographic_parity_diff": {
         "function": "Measure",

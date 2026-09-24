@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from jinja2 import Template
@@ -12,7 +12,6 @@ from . import __version__
 from .metrics import AuditResult
 from .provenance import attach_body_hash
 from .rmf import RMF_MAPPING, rmf_section
-
 
 METHODS_NOTE = (
     "Selection rate is the share of positive model decisions per group. "
@@ -83,15 +82,7 @@ def to_markdown(result: AuditResult) -> str:
     )
     for group in result.groups:
         lines.append(
-            "| {group} | {n} | {selection_rate} | {tpr} | {fpr} | {precision} | {accuracy} |".format(
-                group=_markdown_cell(group.group),
-                n=group.n,
-                selection_rate=_format_value(group.selection_rate),
-                tpr=_format_value(group.tpr),
-                fpr=_format_value(group.fpr),
-                precision=_format_value(group.precision),
-                accuracy=_format_value(group.accuracy),
-            )
+            f"| {_markdown_cell(group.group)} | {group.n} | {_format_value(group.selection_rate)} | {_format_value(group.tpr)} | {_format_value(group.fpr)} | {_format_value(group.precision)} | {_format_value(group.accuracy)} |"
         )
     lines.extend(
         [

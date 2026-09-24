@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import html as _html
 
-
 _CSS = """
 body { font-family: system-ui, sans-serif; line-height: 1.5; color: #172033;
        margin: 2rem auto; max-width: 72rem; padding: 0 1rem; }

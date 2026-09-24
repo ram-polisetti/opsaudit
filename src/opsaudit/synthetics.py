@@ -32,8 +32,8 @@ Example:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -99,7 +99,7 @@ class SyntheticAuditConfig:
     seed: int = 42
 
     @classmethod
-    def from_dict(cls, raw: Mapping[str, Any] | None) -> "SyntheticAuditConfig":
+    def from_dict(cls, raw: Mapping[str, Any] | None) -> SyntheticAuditConfig:
         """Validate a config mapping, raising ``ValueError`` on problems."""
         if not isinstance(raw, Mapping):
             raise ValueError("synthetic-audit config must be a mapping")
@@ -922,6 +922,6 @@ def audit_synthetic(
         "opsaudit_version": __version__,
         "axes": axes,
         "columns": {"numeric": numeric, "categorical": categorical},
-        "n_source": int(len(source)),
-        "n_synthetic": int(len(synthetic)),
+        "n_source": len(source),
+        "n_synthetic": len(synthetic),
     }

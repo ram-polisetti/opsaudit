@@ -323,3 +323,49 @@ def test_aggregate_judge_findings_shape():
 def test_group_length_mismatch_rejected():
     with pytest.raises(ValueError):
         group_label_rates([_mk("warm")], ["A", "B"])
+
+
+class ExplodingJudgeTarget(Target):
+    """A judging model whose transport always fails."""
+
+    name = "exploding-judge"
+
+    def generate(self, prompts):
+        raise ConnectionError("simulated network failure")
+
+    def describe(self):
+        return {"target_type": "exploding-judge", "name": self.name}
+
+
+class FlakyJudgeTarget(Target):
+    """Succeeds on the first call, explodes on the retry."""
+
+    name = "flaky-judge"
+
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, prompts):
+        self.calls += 1
+        if self.calls == 1:
+            return [""] * len(prompts)  # empties -> triggers retry
+        raise TimeoutError("simulated retry failure")
+
+    def describe(self):
+        return {"target_type": "flaky-judge", "name": self.name}
+
+
+def test_judge_transport_failure_scores_all_unscored():
+    judge = RefusalJudge(ExplodingJudgeTarget())
+    scores = judge.score(["text one", "text two"])
+    assert len(scores) == 2
+    assert all(s.unscored for s in scores)
+    assert all("judge model call failed" in s.rationale for s in scores)
+    json.dumps([s.__dict__ for s in scores])  # JSON-safe
+
+
+def test_judge_retry_failure_stays_unscored():
+    judge = RefusalJudge(FlakyJudgeTarget())
+    scores = judge.score(["text one"])
+    assert len(scores) == 1
+    assert scores[0].unscored
