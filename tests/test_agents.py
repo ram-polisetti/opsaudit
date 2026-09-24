@@ -224,6 +224,29 @@ def test_planner_malformed_json_stops_gracefully():
     assert "planner_invalid_spec" in spec.reason
 
 
+def test_planner_prompt_uses_real_attribute_names():
+    # Regression: the prompt once showed a literal {"attr": ["A","B"]}
+    # placeholder, which real LLMs copied verbatim into their specs.
+    planner = AuditPlanner(dict(BRIEF), ScriptedPlannerTarget(["{}"]))
+    prompt = planner._plan_prompt([], 10, 3)
+    assert '"group"' in prompt  # real attribute name from the brief
+    assert '"attr"' not in prompt  # no literal placeholder left
+
+
+def test_planner_rejects_unknown_counterfactual_attribute_gracefully():
+    # A syntactically valid spec naming an attribute that is not a key of
+    # base_input must stop the campaign with a logged reason, not crash
+    # the generator mid-run.
+    target = ScriptedPlannerTarget(
+        [_probe_spec("counterfactual", {"attributes": {"attr": ["A", "B"]}})]
+    )
+    planner = AuditPlanner(dict(BRIEF), target)
+    spec, _ = planner.propose_spec()
+    assert spec.action == "stop"
+    assert "planner_invalid_spec" in spec.reason
+    assert "base_input" in spec.reason
+
+
 def test_planner_empty_response_retries_then_stops():
     target = ScriptedPlannerTarget(["", "   "])
     planner = AuditPlanner(dict(BRIEF), target)

@@ -35,11 +35,11 @@ Brief: target_type={target_type}; protected_attributes={attributes}; risk_areas=
 History: {history}
 Budget left: {probes} probes, {rounds} rounds.
 Pick ONE action:
-- {{"action":"probe","generator":"counterfactual","params":{{"attributes":{{"attr":["A","B"]}}}},"reason":"..."}}
+- {{"action":"probe","generator":"counterfactual","params":{cf_example},"reason":"..."}}
 - {{"action":"probe","generator":"adversarial","params":{{}},"reason":"..."}}
 - {{"action":"probe","generator":"metamorphic","params":{{"inputs":[...]}},"reason":"..."}}
 - {{"action":"stop","reason":"..."}}
-Keep total new probes <= {probes}. For counterfactual, vary attributes where the history shows the largest gaps."""
+Keep total new probes <= {probes}. For counterfactual, vary attributes where the history shows the largest gaps. Use ONLY the protected attribute names from the brief above."""
 
 
 def _extract_json(text: str) -> Any:
@@ -137,6 +137,14 @@ class AuditPlanner:
         risks = self.brief.get("risk_areas", [])
         risks_s = ",".join(risks) if isinstance(risks, list) else str(risks)
         history_s = "; ".join(history[-3:]) if history else "none yet"
+        # Concrete example built from the brief's REAL attribute names --
+        # a literal placeholder here gets copied verbatim by real LLMs.
+        if isinstance(attrs, dict) and attrs:
+            ex_attr = sorted(attrs)[0]
+            ex_vals = list(attrs[ex_attr])[:2]
+            cf_example = json.dumps({"attributes": {ex_attr: ex_vals}})
+        else:
+            cf_example = json.dumps({"attributes": {"attr": ["A", "B"]}})
         return _PLAN_PROMPT.format(
             target_type=self.brief["target_type"],
             attributes=attr_names or "none listed",
@@ -144,6 +152,7 @@ class AuditPlanner:
             history=history_s,
             probes=remaining_probes,
             rounds=remaining_rounds,
+            cf_example=cf_example,
         )
 
     @staticmethod
@@ -244,8 +253,7 @@ class AuditPlanner:
     # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
-    @staticmethod
-    def _validate_spec(parsed: Any) -> ProbeSpec:
+    def _validate_spec(self, parsed: Any) -> ProbeSpec:
         """Validate a parsed planner response into a :class:`ProbeSpec`.
 
         Raises:
@@ -286,6 +294,21 @@ class AuditPlanner:
                     raise ValueError(
                         f"counterfactual attribute {attr!r} needs at "
                         "least two values"
+                    )
+            # Semantic check: the attribute must exist on the base input,
+            # otherwise the generator raises mid-campaign. A real LLM can
+            # still invent names, so reject here -> graceful logged stop.
+            base = self.brief.get("base_input")
+            if (
+                self.brief.get("target_type") == "tabular"
+                and isinstance(base, dict)
+            ):
+                unknown = [a for a in attrs if a not in base]
+                if unknown:
+                    raise ValueError(
+                        f"counterfactual attribute(s) {unknown} are not "
+                        f"keys of the brief's base_input "
+                        f"(keys: {sorted(base)}); use only real feature names"
                     )
         elif generator == "metamorphic":
             inputs = params.get("inputs")

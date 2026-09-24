@@ -13,6 +13,21 @@ from typing import Any
 from .base import Target
 
 
+def _to_native(value: Any) -> Any:
+    """Convert numpy/pandas scalars to plain Python natives.
+
+    ``getattr(value, "item", None)`` is the duck-typed hook: numpy
+    scalars expose ``.item()``; plain Python values don't.
+    """
+    item = getattr(value, "item", None)
+    if callable(item):
+        try:
+            return item()
+        except (ValueError, TypeError, AttributeError):
+            pass
+    return value
+
+
 class TabularTarget(Target):
     """Audit a tabular classifier.
 
@@ -44,12 +59,16 @@ class TabularTarget(Target):
                 f"underlying estimator.predict failed: {exc}"
             ) from exc
         try:
-            return list(raw)
+            items = list(raw)
         except TypeError as exc:
             raise ValueError(
                 "estimator.predict(X) must return an iterable of "
                 f"predictions; got {type(raw).__name__}"
             ) from exc
+        # Normalize numpy/pandas scalars to Python natives: downstream
+        # scoring (_is_number) and the JSON evidence log both assume
+        # plain int/float/str, and a numpy.int64 is neither.
+        return [_to_native(v) for v in items]
 
     def predict_proba(self, X: Any) -> list[list[float]] | None:
         """Return class probabilities when the estimator supports them."""

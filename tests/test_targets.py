@@ -127,6 +127,19 @@ class TestTabularTarget:
 
         assert TabularTarget(Numpyish()).predict([[0], [1]]) == [1, 0]
 
+    def test_predict_returns_python_natives(self):
+        # Regression: numpy scalars (np.int64) failed _is_number in the
+        # agentic campaign's scorer, so a real sklearn-backed tabular
+        # target silently produced strength 0.0 on every round.
+        class Numpyish:
+            def predict(self, X):
+                import numpy as np
+
+                return np.array([1, 0])
+
+        preds = TabularTarget(Numpyish()).predict([[0], [1]])
+        assert all(type(p) is int for p in preds)
+
     def test_predict_proba_when_supported(self):
         t = TabularTarget(_FakeEstimator([1], proba=[[0.2, 0.8]]))
         assert t.predict_proba([[9]]) == [[0.2, 0.8]]

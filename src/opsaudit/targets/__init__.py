@@ -13,7 +13,7 @@ with an actionable message instead of failing at import time.
 
 from .base import Target
 from .hf import HuggingFaceTarget
-from .ollama import OllamaTarget
+from .ollama import OllamaTarget, SecureOllamaTarget
 from .openai_compat import OpenAICompatTarget
 from .rag import RagTarget
 from .tabular import TabularTarget
@@ -22,6 +22,7 @@ __all__ = [
     "Target",
     "HuggingFaceTarget",
     "OllamaTarget",
+    "SecureOllamaTarget",
     "OpenAICompatTarget",
     "RagTarget",
     "TabularTarget",
