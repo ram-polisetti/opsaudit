@@ -2,6 +2,44 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.2.1 — 2026-09-24
+
+Patch release driven by the first real end-to-end audits on real data
+(UCI Adult, ProPublica COMPAS) with a real trained model and a real
+LLM planner — three defects unit tests could not catch.
+
+### Fixed
+
+- Planner prompt now renders the real protected-attribute names/values from
+  the audit brief and instructs the model to use only those names, instead
+  of echoing the literal `{"attr":["A","B"]}` placeholder.
+- Campaign validation rejects planned counterfactual attributes absent from
+  the base input; invalid plans now become logged graceful stops instead of
+  crashes.
+- NumPy/Pandas scalar outputs (`numpy.int64`, etc.) are normalized to
+  Python-native values before judging — sklearn model predictions previously
+  scored strength 0.0 silently.
+- Added `SecureOllamaTarget`: Ollama Cloud access through the stored
+  `custom.ollama` connector via authd surrogates. No raw key is read,
+  printed, persisted, or required in the environment; `describe()` and
+  evidence records never carry credentials.
+
+### Added
+
+- Three regression tests covering the fixes above.
+- Real-audit evidence for the Adult and COMPAS runs (metrics, gate verdicts,
+  agentic campaign report).
+
+### Verified (2026-09-24, real data, real model, real planner)
+
+- Adult: 30,162 clean rows, DI ratio 0.264 → gate FAIL (exit 1); tamper
+  detection on predictions and metrics confirmed.
+- COMPAS: 6,150-row African-American/Caucasian subset, DI ratio 0.592 →
+  gate FAIL.
+- Real agentic campaign on Adult found a genuine individual-level sex gap
+  (prediction flipped 1→0 on sex alone) → `FINDINGS WARRANT REVIEW`.
+- 291 tests pass.
+
 ## 0.2.0 — 2026-09-22
 
 The agentic LLM auditor: point opsaudit at any model (tabular classifier, chat model, RAG pipeline) and get an adaptive audit. The deterministic v0.1 core is untouched — all v0.1 tests stay green. Includes everything listed under 0.1.1 (Unreleased) below.
