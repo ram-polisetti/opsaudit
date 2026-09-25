@@ -81,6 +81,55 @@ report = build_report(result, target=campaign.audited_target,
 save_agentic_report(report, "agentic_report")   # .md + .html + .json
 ```
 
+### Bring your own model: the 15-line adapter
+
+The auditor never touches your model — it only touches the `Target`
+contract: `predict(X)` for scoring models, `generate(prompts)` for text
+models, plus `describe()` for the evidence log. Ready-made adapters cover
+the common cases:
+
+| Your model | Adapter | Notes |
+|---|---|---|
+| sklearn, XGBoost, LightGBM | `TabularTarget` | duck-typed on `.predict(X)` — no sklearn import needed |
+| OpenAI-compatible API | `OpenAICompatTarget` | chat-completions endpoint |
+| Ollama (local or Cloud) | `OllamaTarget` / `SecureOllamaTarget` | |
+| HuggingFace pipeline | `HuggingFaceTarget` | text-generation pipelines |
+| RAG pipeline | `RagTarget` | wraps any `query -> str` function |
+
+Anything else — PyTorch, TensorFlow, Spark ML, a REST endpoint — gets a
+small adapter *you* write, translating the contract into your model's
+dialect. This is deliberate: the framework stays small by defining one
+interface instead of learning every library's API. PyTorch example:
+
+```python
+from opsaudit.targets import Target
+
+class TorchTarget(Target):
+    """Audit a PyTorch classifier: Target contract on one side,
+    whatever dialect your model speaks on the other."""
+
+    def __init__(self, module, encode_row, *, name="torch-model"):
+        self.module = module            # your nn.Module
+        self.encode_row = encode_row    # applicant dict -> tensor
+        self._name = name
+
+    def predict(self, X):
+        import pandas as pd, torch
+        rows = X if isinstance(X, pd.DataFrame) else pd.DataFrame(X)
+        self.module.eval()
+        with torch.no_grad():
+            batch = torch.stack([self.encode_row(r) for _, r in rows.iterrows()])
+            return [int(v) for v in self.module(batch).argmax(dim=1).tolist()]
+
+    def describe(self):
+        return {"target_type": "tabular", "name": self._name,
+                "framework": "pytorch"}
+```
+
+Then `AuditCampaign(audited_target=TorchTarget(...), ...)` — and everything
+downstream (probes, metrics, planner, evidence log, report) is unchanged.
+Rule of thumb: if you can turn rows into outputs, you can audit it.
+
 **The hard rules** (enforced in code review, not just docs):
 
 - The LLM proposes; the statistics dispose. Judges turn text into *labels*; every rate, gap, and verdict is computed in deterministic code.
