@@ -32,7 +32,12 @@ proposes, the boring part disposes, and the evidence log records both.
   never crashes a campaign — it ends it with a logged reason
   (`planner_invalid_spec` / `planner_empty_response`). Specs are
   validated before use (known generator, counterfactuals need
-  `{attr: [2+ values]}`, metamorphic needs `inputs`).
+  `{attr: [2+ values]}`, metamorphic needs `inputs`; counterfactual
+  attribute names must be keys of the brief's `base_input`, and every
+  proposed value must come from the brief's `protected_attributes` (or
+  the optional `attribute_values` allowlist for non-protected
+  attributes) — invented values stop the campaign before any probe
+  executes).
 - `src/opsaudit/agents/budgets.py` — `Budget` (max probes/rounds/cost,
   per-probe and per-planner-call cost model, flatness rule) and
   `BudgetTracker`. Every stopping rule is a pure function of counters:

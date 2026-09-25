@@ -52,6 +52,14 @@ def _extract_json(text: str) -> Any:
     return json.loads(cleaned[start : end + 1])
 
 
+def _safe_equal(a: Any, b: Any) -> bool:
+    """Equality that never raises (values may be unhashable or mixed-type)."""
+    try:
+        return bool(a == b)
+    except Exception:  # pragma: no cover - defensive  # noqa: BLE001
+        return False
+
+
 @dataclass(frozen=True)
 class ProbeSpec:
     """One planner decision: what to probe next, or stop.
@@ -83,8 +91,10 @@ class AuditPlanner:
 
     Args:
         brief: Audit brief dict. Required keys: ``"target_type"``
-            (``"tabular"`` or ``"text"``). Recommended: 
+            (``"tabular"`` or ``"text"``). Recommended:
             ``"protected_attributes"`` (``{attr: [values]}``),
+            ``"attribute_values"`` (``{attr: [values]}`` allowlist for
+            non-protected attributes the planner may vary),
             ``"risk_areas"`` (list of str), ``"base_input"`` (reference
             input for the generators), ``"text_field"`` (for text-mode
             counterfactual templates).
@@ -310,6 +320,29 @@ class AuditPlanner:
                         f"keys of the brief's base_input "
                         f"(keys: {sorted(base)}); use only real feature names"
                     )
+            # Value check: the name check above cannot catch invented
+            # VALUES. A planner LLM once proposed race/age-bin values
+            # absent from the data; the sklearn target silently routed
+            # the resulting NaNs and polluted the pooled metrics. Every
+            # proposed value must come from the brief's allowlists, or the
+            # spec is rejected -> graceful logged stop, before any probe
+            # executes.
+            allowlists = self._value_allowlists()
+            for attr, values in attrs.items():
+                allowed = allowlists.get(attr)
+                if allowed is None:
+                    continue  # no allowlist declared: names checked, values not
+                invented = [
+                    v
+                    for v in values
+                    if not any(_safe_equal(v, a) for a in allowed)
+                ]
+                if invented:
+                    raise ValueError(
+                        f"counterfactual attribute {attr!r} has value(s) "
+                        f"{invented!r} not in the brief's allowed values "
+                        f"{list(allowed)!r}; use only values from the brief"
+                    )
         elif generator == "metamorphic":
             inputs = params.get("inputs")
             if not isinstance(inputs, list) or not inputs:
@@ -329,3 +362,26 @@ class AuditPlanner:
             params=params,
             reason=reason,
         )
+
+    def _value_allowlists(self) -> dict[str, list[Any]]:
+        """Allowed per-attribute values for planner-proposed counterfactuals.
+
+        Built from the brief: ``protected_attributes`` (``{attr: [values]}``)
+        plus the optional ``attribute_values`` mapping, which declares
+        allowlists for non-protected attributes the planner may vary.
+        ``attribute_values`` wins on conflicts. Attributes with no entry
+        keep the legacy behavior (names validated, values not) — the
+        boundary is deliberate and tested.
+        """
+        allowlists: dict[str, list[Any]] = {}
+        protected = self.brief.get("protected_attributes")
+        if isinstance(protected, dict):
+            for attr, values in protected.items():
+                if isinstance(values, list):
+                    allowlists[attr] = list(values)
+        extra = self.brief.get("attribute_values")
+        if isinstance(extra, dict):
+            for attr, values in extra.items():
+                if isinstance(values, list):
+                    allowlists[attr] = list(values)
+        return allowlists

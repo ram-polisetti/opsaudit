@@ -6,6 +6,14 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Planner `_validate_spec` now validates counterfactual *values* against the
+  brief's allowlists (`protected_attributes`, plus the new optional
+  `attribute_values` for non-protected attributes), not just attribute
+  *names*. A planner LLM had invented race/age-bin values the name check
+  could not catch; the sklearn target silently routed the resulting NaNs
+  and polluted pooled metrics. Invented values now stop the campaign with
+  a logged `planner_invalid_spec` reason before any probe executes.
+  Attributes with no allowlist keep the legacy name-only check.
 - `ruff check` is clean (was 66 findings): implicit string concatenations
   parenthesized, blind `except Exception` catches documented with `noqa`
   (each is an intentional never-crash boundary), subprocess calls carry

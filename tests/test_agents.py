@@ -246,6 +246,81 @@ def test_planner_rejects_unknown_counterfactual_attribute_gracefully():
     assert "base_input" in spec.reason
 
 
+def test_planner_rejects_invented_counterfactual_values_gracefully():
+    # Regression (2026-09-24): a planner LLM invented race/age-bin values
+    # the attribute-name check could not catch; the sklearn target silently
+    # routed the resulting NaNs and polluted pooled metrics. Invented
+    # values must stop the campaign with a logged reason before any probe
+    # executes.
+    target = ScriptedPlannerTarget(
+        [
+            _probe_spec(
+                "counterfactual",
+                {"attributes": {"group": ["FT", "Martian"]}},
+            )
+        ]
+    )
+    planner = AuditPlanner(dict(BRIEF), target)
+    spec, _ = planner.propose_spec()
+    assert spec.action == "stop"
+    assert "planner_invalid_spec" in spec.reason
+    assert "Martian" in spec.reason
+    assert "allowed values" in spec.reason
+
+
+def test_planner_accepts_subset_of_allowed_values():
+    target = ScriptedPlannerTarget(
+        [_probe_spec("counterfactual", {"attributes": {"group": ["PT", "temp"]}})]
+    )
+    planner = AuditPlanner(dict(BRIEF), target)
+    spec, _ = planner.propose_spec()
+    assert spec.action == "probe"
+    assert spec.params["attributes"] == {"group": ["PT", "temp"]}
+
+
+def test_planner_skips_value_check_for_unlisted_attribute():
+    # Attributes with no allowlist in the brief keep the legacy behavior:
+    # names are validated, values are not. This documents the boundary of
+    # the value check rather than silently extending it.
+    target = ScriptedPlannerTarget(
+        [_probe_spec("counterfactual", {"attributes": {"tenure_months": [6, 600]}})]
+    )
+    planner = AuditPlanner(dict(BRIEF), target)
+    spec, _ = planner.propose_spec()
+    assert spec.action == "probe"
+
+
+def test_planner_honors_attribute_values_allowlist():
+    brief = dict(BRIEF)
+    brief["attribute_values"] = {"tenure_months": [6, 12, 24]}
+    target = ScriptedPlannerTarget(
+        [_probe_spec("counterfactual", {"attributes": {"tenure_months": [6, 600]}})]
+    )
+    planner = AuditPlanner(brief, target)
+    spec, _ = planner.propose_spec()
+    assert spec.action == "stop"
+    assert "planner_invalid_spec" in spec.reason
+    assert "600" in spec.reason
+
+
+def test_campaign_never_executes_probes_with_invented_values(tmp_path):
+    # End-to-end: invented values stop the campaign before the audited
+    # target sees a single probe.
+    audited = CountingTarget(lambda X: [1] * len(X))
+    report, _ = _campaign(
+        [
+            _probe_spec(
+                "counterfactual",
+                {"attributes": {"group": ["FT", "Martian"]}},
+            )
+        ],
+        audited,
+        tmp_path,
+    )
+    assert audited.predict_calls == 0
+    assert report.stop_reason.startswith("planner_stop:planner_invalid_spec")
+
+
 def test_planner_empty_response_retries_then_stops():
     target = ScriptedPlannerTarget(["", "   "])
     planner = AuditPlanner(dict(BRIEF), target)
