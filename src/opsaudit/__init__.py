@@ -20,6 +20,15 @@ from .calibration import (
 )
 from .context import load_context
 from .data import generate_dispatch, generate_staffing
+from .eu_ai_act import (
+    Classification,
+    CrossCheck,
+    SystemProfile,
+    USE_CASES,
+    classify_system,
+    cross_check_gate,
+    eu_ai_act_section,
+)
 from .evidence import EvidenceLog
 from .gate import DEFAULT_THRESHOLDS, evaluate_gate, evaluate_gate_status
 from .gate_ci import (
@@ -101,6 +110,8 @@ __all__ = [
     "CalibrationHarness",
     "CalibrationReport",
     "CampaignReport",
+    "Classification",
+    "CrossCheck",
     "EvidenceLog",
     "HuggingFaceTarget",
     "Judge",
@@ -116,9 +127,11 @@ __all__ = [
     "RefusalJudge",
     "ResponseCache",
     "StereotypeJudge",
+    "SystemProfile",
     "TabularTarget",
     "Target",
     "ToneJudge",
+    "USE_CASES",
     "__version__",
     "agentic_rmf_section",
     "agentic_to_html",
@@ -129,8 +142,11 @@ __all__ = [
     "build_report",
     "check_equal_output",
     "check_symmetry",
+    "classify_system",
     "cohen_kappa",
+    "cross_check_gate",
     "decide_exit",
+    "eu_ai_act_section",
     "evaluate_gate",
     "evaluate_gate_status",
     "evaluate_metamorphic",
